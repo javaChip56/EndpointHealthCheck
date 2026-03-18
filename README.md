@@ -28,6 +28,8 @@ Implemented so far:
 - Phase 13: publish and deployment validation
 - Phase 14: GitHub Actions CI/CD and Dependabot automation
 - Post-v1: endpoint import flow with live probe, YAML preview, and diff comparison
+- Post-v1: CLI execution mode with JSON/XML reporting
+- Post-v1: YAML hot-reload for dashboard and endpoint files
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -87,6 +89,7 @@ Current configuration support:
 - `${ENV_VAR}` substitution in YAML values
 - endpoint definitions can be kept inline in `dashboard.yaml` or split into multiple files under [`src/ApiHealthDashboard/endpoints`](src/ApiHealthDashboard/endpoints)
 - project YAML files are copied to both build and publish output by default
+- runtime changes to `dashboard.yaml` and referenced endpoint YAML files are watched and hot-reloaded without restarting the app
 
 Validation currently checks:
 - required endpoint id, name, and url
@@ -165,6 +168,19 @@ Current behavior:
 - records last checked time, last successful time, duration, status, and current error
 - keeps slow endpoints from blocking other endpoint loops
 - already exposes a scheduler interface that Phase 8 can reuse for manual refresh actions
+- restarts enabled polling loops automatically when YAML hot-reload changes the configured endpoint set
+
+### YAML Hot-Reload
+
+The web app now watches the dashboard YAML and referenced endpoint YAML files for runtime changes.
+
+Current hot-reload behavior:
+- detects create, update, delete, and rename events for `dashboard.yaml` and referenced endpoint YAML files
+- reloads configuration with a short debounce to avoid duplicate reload storms while saving
+- applies the new config without restarting the app when YAML stays valid
+- keeps the last successfully loaded config active if a reload fails
+- updates the visible configuration warning banner when reload warnings or failures occur
+- preserves runtime status for endpoints that still exist after a reload and initializes new endpoints as `Unknown`
 
 ### Manual Refresh Actions
 
@@ -202,6 +218,18 @@ Current import behavior:
 - generates a normalized YAML snippet for manual copy into `dashboard.yaml` or a separate endpoint file
 - compares the generated YAML against the currently loaded config when an existing endpoint matches by id or URL
 - shows a diff preview plus a raw response preview for review before any manual save
+
+### CLI Execution
+
+The app now includes a one-shot CLI mode for scripted health execution without starting the web UI.
+
+Current CLI behavior:
+- executes the full configured suite with `--cli --all`
+- executes one or more specific endpoint YAML files with repeated `--endpoint-file` arguments
+- reuses dashboard settings from `dashboard.yaml`, including default request timeout values
+- writes a machine-readable JSON report to standard output
+- can optionally write the same execution report to a JSON or XML file
+- keeps missing dashboard or endpoint YAML files as warnings in the output instead of failing hard
 
 ### Endpoint Details
 
@@ -262,9 +290,9 @@ Current automation files:
 - [`.github/dependabot.yml`](.github/dependabot.yml)
 
 Current automation behavior:
-- CI runs on pushes to `main` and `develop`, and on pull requests targeting those branches
+- CI runs on pushes to `master`, `develop`, and `enhancements`, and on pull requests targeting those branches
 - CI restores, builds in Release mode, runs tests, and uploads TRX test results
-- CodeQL runs for C# on pushes to `main`, pull requests targeting `main`, and manual dispatches
+- CodeQL runs for C# on pushes to `master`, `develop`, and `enhancements`, pull requests targeting those branches, and manual dispatches
 - Release automation verifies the solution, publishes self-contained artifacts for `win-x64` and `linux-x64`, packages them, generates checksums, and uploads them to the GitHub release
 - Dependabot monitors both NuGet dependencies and GitHub Actions workflow dependencies on a weekly schedule
 
@@ -288,6 +316,36 @@ You can also override it with an environment variable:
 $env:APIHEALTHDASHBOARD_BOOTSTRAP__DASHBOARDCONFIGPATH="D:\path\to\dashboard.yaml"
 dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj
 ```
+
+## Running The CLI
+
+Run the full suite and print JSON to stdout:
+
+```powershell
+dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj --no-build --no-launch-profile -- --cli --all
+```
+
+Run only selected endpoint YAML files:
+
+```powershell
+dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj --no-build --no-launch-profile -- --cli --endpoint-file .\src\ApiHealthDashboard\endpoints\orders-api.yaml --endpoint-file .\src\ApiHealthDashboard\endpoints\billing-api.yaml
+```
+
+Write a JSON or XML file in addition to the JSON stdout output:
+
+```powershell
+dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj --no-build --no-launch-profile -- --cli --all --output-file .\artifacts\health-report.json
+dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj --no-build --no-launch-profile -- --cli --all --output-file .\artifacts\health-report.xml --output-format xml
+```
+
+For the cleanest machine-readable stdout, prefer a published build or `dotnet run` with both `--no-build` and `--no-launch-profile`.
+
+Optional CLI arguments:
+- `--dashboard-config <path>` to override the dashboard YAML path
+- `--all` to execute the whole configured suite
+- `--endpoint-file <path>` to execute only selected endpoint YAML files
+- `--output-file <path>` to persist the report to disk
+- `--output-format json|xml` to choose file output format
 
 ## Running Tests
 
@@ -317,7 +375,7 @@ Deployment notes:
 ## CI/CD Automation
 
 Repository automation now includes:
-- CI build and test workflow for `main` and `develop`
+- CI build and test workflow for `master`, `develop`, and `enhancements`
 - CodeQL SAST workflow for C#
 - release packaging workflow for self-contained GitHub release artifacts
 - Dependabot configuration for NuGet and GitHub Actions dependencies
@@ -336,6 +394,9 @@ Local note:
 - the workflow files were added and reviewed locally, and the application build still passes, but this shell environment does not include a YAML workflow linter for direct execution-free validation
 
 Current automated coverage includes:
+- CLI option parsing and validation
+- CLI report JSON and XML serialization
+- CLI execution summary generation for full-suite and selected-endpoint runs
 - valid YAML load
 - normalization of null optional collections
 - missing configuration file handling
@@ -417,7 +478,6 @@ Test file:
 ## Future Plans
 
 These are planned enhancements after the current v1 path:
-- add CLI execution with machine-readable output for automation and scripting scenarios
 - allow per-endpoint priority so important endpoints can be surfaced and scheduled differently
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API
 

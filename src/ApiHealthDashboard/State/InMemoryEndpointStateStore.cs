@@ -54,12 +54,22 @@ public sealed class InMemoryEndpointStateStore : IEndpointStateStore
 
         lock (_syncRoot)
         {
+            var existingStates = new Dictionary<string, EndpointState>(_states, StringComparer.OrdinalIgnoreCase);
             _states.Clear();
 
             foreach (var endpoint in endpoints)
             {
                 if (endpoint is null || string.IsNullOrWhiteSpace(endpoint.Id))
                 {
+                    continue;
+                }
+
+                if (existingStates.TryGetValue(endpoint.Id, out var existingState))
+                {
+                    var preservedState = existingState.Clone();
+                    preservedState.EndpointId = endpoint.Id;
+                    preservedState.EndpointName = endpoint.Name;
+                    _states[endpoint.Id] = preservedState;
                     continue;
                 }
 

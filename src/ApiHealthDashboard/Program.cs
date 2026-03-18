@@ -1,11 +1,24 @@
+using ApiHealthDashboard.Cli;
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Parsing;
 using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.Services;
 using ApiHealthDashboard.State;
+using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+var cliParseResult = CliOptions.Parse(args);
+
+if (cliParseResult.IsCliMode)
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole(options =>
+    {
+        options.LogToStandardErrorThreshold = LogLevel.Trace;
+        options.FormatterName = ConsoleFormatterNames.Simple;
+    });
+}
 
 builder.Configuration.AddEnvironmentVariables(prefix: "APIHEALTHDASHBOARD_");
 
@@ -60,7 +73,7 @@ builder.Services.AddSingleton(static serviceProvider =>
     return new ConfigurationWarningState(loadResult.Warnings);
 });
 builder.Services.AddSingleton(static serviceProvider =>
-    serviceProvider.GetRequiredService<DashboardConfigLoadResult>().Config);
+    serviceProvider.GetRequiredService<DashboardConfigLoadResult>().Config.Clone());
 builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<DashboardConfig>();
@@ -79,14 +92,94 @@ builder.Services.AddHttpClient(nameof(EndpointPoller));
 builder.Services.AddSingleton<IEndpointPoller, EndpointPoller>();
 builder.Services.AddSingleton<IEndpointImportService, EndpointImportService>();
 builder.Services.AddSingleton<IHealthResponseParser, HealthResponseParser>();
+builder.Services.AddSingleton<CliExecutionService>();
 builder.Services.AddSingleton<PollingSchedulerService>();
 builder.Services.AddSingleton<IEndpointScheduler>(static serviceProvider =>
     serviceProvider.GetRequiredService<PollingSchedulerService>());
 builder.Services.AddHostedService(static serviceProvider =>
     serviceProvider.GetRequiredService<PollingSchedulerService>());
+builder.Services.AddSingleton<DashboardConfigHotReloadService>();
+builder.Services.AddHostedService(static serviceProvider =>
+    serviceProvider.GetRequiredService<DashboardConfigHotReloadService>());
 builder.Services.AddRazorPages();
 
-var app = builder.Build();
+await using var app = builder.Build();
+
+if (cliParseResult.IsCliMode)
+{
+    if (cliParseResult.IsHelpRequested)
+    {
+        Console.WriteLine(CliOptions.GetHelpText());
+        return;
+    }
+
+    if (!cliParseResult.IsValid || cliParseResult.Options is null)
+    {
+        Console.Error.WriteLine(cliParseResult.ErrorMessage ?? "Invalid CLI arguments.");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine(CliOptions.GetHelpText());
+        Environment.ExitCode = 2;
+        return;
+    }
+
+    try
+    {
+        var cliOptions = cliParseResult.Options;
+        var bootstrapOptions = app.Services.GetRequiredService<IOptions<DashboardBootstrapOptions>>().Value;
+        var yamlLoader = app.Services.GetRequiredService<IYamlConfigLoader>();
+        var httpClientFactory = app.Services.GetRequiredService<IHttpClientFactory>();
+        var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
+        var timeProvider = app.Services.GetRequiredService<TimeProvider>();
+
+        var resolvedDashboardPath = ResolveConfigPath(
+            string.IsNullOrWhiteSpace(cliOptions.DashboardConfigPathOverride)
+                ? bootstrapOptions.ResolveDashboardConfigPath()
+                : cliOptions.DashboardConfigPathOverride,
+            app.Environment.ContentRootPath);
+
+        var loadResult = cliOptions.RunAll
+            ? yamlLoader.Load(resolvedDashboardPath)
+            : yamlLoader.LoadSelectedEndpoints(resolvedDashboardPath, cliOptions.EndpointFiles);
+
+        var poller = new EndpointPoller(
+            httpClientFactory,
+            loadResult.Config,
+            loggerFactory.CreateLogger<EndpointPoller>());
+        var parser = new HealthResponseParser(loggerFactory.CreateLogger<HealthResponseParser>());
+        var cliExecutionService = new CliExecutionService(
+            poller,
+            parser,
+            timeProvider,
+            loggerFactory.CreateLogger<CliExecutionService>());
+        var report = await cliExecutionService.ExecuteAsync(
+            loadResult.Config,
+            cliOptions,
+            resolvedDashboardPath,
+            loadResult.Warnings,
+            CancellationToken.None);
+
+        Console.WriteLine(CliReportSerializer.SerializeJson(report));
+
+        if (!string.IsNullOrWhiteSpace(cliOptions.OutputFilePath))
+        {
+            var outputPath = ResolveOutputPath(cliOptions.OutputFilePath, app.Environment.ContentRootPath);
+            await CliReportSerializer.WriteToFileAsync(
+                report,
+                outputPath,
+                cliOptions.ResolveOutputFileFormat(),
+                CancellationToken.None);
+        }
+
+        return;
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "CLI execution failed.");
+        Console.Error.WriteLine(ex.Message);
+        Environment.ExitCode = 1;
+        return;
+    }
+}
 
 app.Logger.LogInformation(
     "Starting ApiHealthDashboard in {EnvironmentName} environment with content root {ContentRoot}.",
@@ -145,10 +238,17 @@ app.Run();
 static string ResolveConfigPath(string configuredPath, string contentRootPath)
 {
     var configPath = string.IsNullOrWhiteSpace(configuredPath)
-        ? "endpoints.yaml"
+        ? "dashboard.yaml"
         : configuredPath;
 
     return Path.IsPathRooted(configPath)
         ? Path.GetFullPath(configPath)
         : Path.GetFullPath(Path.Combine(contentRootPath, configPath));
+}
+
+static string ResolveOutputPath(string configuredPath, string contentRootPath)
+{
+    return Path.IsPathRooted(configuredPath)
+        ? Path.GetFullPath(configuredPath)
+        : Path.GetFullPath(Path.Combine(contentRootPath, configuredPath));
 }
