@@ -1,17 +1,60 @@
 name: Release
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release tag or version label, for example v1.0.1"
+        required: true
+        type: string
+      publish_to_github_release:
+        description: "Upload packaged artifacts to a GitHub release"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  prepare:
+    name: Resolve Release Context
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.resolve.outputs.release_version }}
+      should_upload_release: ${{ steps.resolve.outputs.should_upload_release }}
+
+    steps:
+      - name: Resolve release metadata
+        id: resolve
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "push") {
+            $releaseVersion = "${{ github.ref_name }}"
+            $shouldUpload = "true"
+          }
+          else {
+            $releaseVersion = "${{ inputs.release_version }}"
+            $shouldUpload = if ("${{ inputs.publish_to_github_release }}" -eq "true") { "true" } else { "false" }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($releaseVersion)) {
+            throw "A release version could not be resolved."
+          }
+
+          "release_version=$releaseVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "should_upload_release=$shouldUpload" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
   verify:
     name: Verify Release Build
+    needs: prepare
     runs-on: ubuntu-latest
 
     steps:
@@ -34,7 +77,9 @@ jobs:
 
   publish:
     name: Publish ${{ matrix.runtime }}
-    needs: verify
+    needs:
+      - prepare
+      - verify
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -47,7 +92,7 @@ jobs:
 
     env:
       PROJECT_PATH: src/ApiHealthDashboard/ApiHealthDashboard.csproj
-      RELEASE_VERSION: ${{ github.event.release.tag_name || github.ref_name }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
 
     steps:
       - name: Checkout repository
@@ -73,16 +118,25 @@ jobs:
         if: ${{ matrix.archive_extension == 'tar.gz' }}
         run: tar -C "./artifacts/publish/${{ matrix.runtime }}" -czf "./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.tar.gz" .
 
+      - name: Generate checksum
+        run: sha256sum "./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}" > "./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}.sha256"
+
       - name: Upload packaged artifact to workflow run
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.runtime }}
-          path: ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}
+          path: |
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}.sha256
           if-no-files-found: error
 
-      - name: Upload artifact to GitHub Release
-        if: ${{ github.event_name == 'release' }}
+      - name: Upload artifacts to GitHub Release
+        if: ${{ needs.prepare.outputs.should_upload_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          files: ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}
+          tag_name: ${{ env.RELEASE_VERSION }}
+          generate_release_notes: true
           fail_on_unmatched_files: true
+          files: |
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}.sha256

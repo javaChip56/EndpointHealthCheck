@@ -245,7 +245,7 @@ Current automation behavior:
 - CI runs on pushes to `main` and `develop`, and on pull requests targeting those branches
 - CI restores, builds in Release mode, runs tests, and uploads TRX test results
 - CodeQL runs for C# on pushes to `main`, pull requests targeting `main`, and manual dispatches
-- Release automation verifies the solution, publishes self-contained artifacts for `win-x64` and `linux-x64`, packages them, and uploads them to the GitHub release
+- Release automation verifies the solution, publishes self-contained artifacts for `win-x64` and `linux-x64`, packages them, generates checksums, and uploads them to the GitHub release
 - Dependabot monitors both NuGet dependencies and GitHub Actions workflow dependencies on a weekly schedule
 
 ## Running The App
@@ -299,6 +299,16 @@ Repository automation now includes:
 - CodeQL SAST workflow for C#
 - release packaging workflow for self-contained GitHub release artifacts
 - Dependabot configuration for NuGet and GitHub Actions dependencies
+
+Release flow:
+1. Create and push a version tag such as `v1.0.1`
+2. GitHub Actions runs the release workflow automatically
+3. The workflow verifies build and tests, publishes `win-x64` and `linux-x64` self-contained outputs, packages them, and generates `.sha256` checksum files
+4. The packaged artifacts are attached to the GitHub release
+
+Manual release flow:
+- Run the `Release` workflow from GitHub Actions with a `release_version`
+- Optionally enable GitHub release upload from the workflow-dispatch input
 
 Local note:
 - the workflow files were added and reviewed locally, and the application build still passes, but this shell environment does not include a YAML workflow linter for direct execution-free validation
