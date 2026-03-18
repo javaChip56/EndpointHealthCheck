@@ -18,9 +18,9 @@ Implemented so far:
 - Phase 3: YAML configuration models, loader, validation, and tests
 - Phase 4: in-memory runtime state store and tests
 - Phase 5: HTTP endpoint poller and tests
+- Phase 6: health response parser and tests
 
 Not implemented yet:
-- health response parsing
 - scheduler
 - manual refresh actions
 - real dashboard data binding
@@ -122,6 +122,22 @@ Current behavior:
 - distinguishes success, timeout, network failure, HTTP failure, empty response, and unknown failure
 - avoids logging secret header values
 
+### Health Response Parser
+
+The app now includes a JSON health response parser that normalizes flexible payload shapes into recursive runtime models.
+
+Parser components:
+- [`src/ApiHealthDashboard/Parsing/IHealthResponseParser.cs`](src/ApiHealthDashboard/Parsing/IHealthResponseParser.cs)
+- [`src/ApiHealthDashboard/Parsing/HealthResponseParser.cs`](src/ApiHealthDashboard/Parsing/HealthResponseParser.cs)
+
+Current behavior:
+- parses simple top-level health payloads with an overall `status`
+- parses `entries` dictionaries common in ASP.NET Core health endpoint output
+- parses nested child structures recursively
+- preserves useful extra fields in snapshot metadata and node data
+- applies per-endpoint `includeChecks` and `excludeChecks` filtering
+- returns a parser-error snapshot instead of crashing on malformed JSON
+
 ## Running The App
 
 From the repository root:
@@ -163,11 +179,17 @@ Current automated coverage includes:
 - poller non-success HTTP status handling
 - poller empty-response handling
 - poller request header application
+- parser flat payload handling
+- parser entries payload handling
+- parser nested payload handling
+- parser recursive filtering behavior
+- parser malformed JSON handling
 
 Test file:
 - [`tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs`](tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs)
 - [`tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs`](tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs)
 - [`tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs`](tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs)
+- [`tests/ApiHealthDashboard.Tests/Parsing/HealthResponseParserTests.cs`](tests/ApiHealthDashboard.Tests/Parsing/HealthResponseParserTests.cs)
 
 ## Important Constraints
 
@@ -184,7 +206,7 @@ Test file:
 - [x] Phase 3 - YAML configuration loader
 - [x] Phase 4 - Runtime state store
 - [x] Phase 5 - HTTP poller
-- [ ] Phase 6 - Health response parser
+- [x] Phase 6 - Health response parser
 - [ ] Phase 7 - Polling scheduler
 - [ ] Phase 8 - Manual refresh actions
 - [ ] Phase 9 - Dashboard summary page

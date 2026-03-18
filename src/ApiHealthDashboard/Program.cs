@@ -1,4 +1,5 @@
 using ApiHealthDashboard.Configuration;
+using ApiHealthDashboard.Parsing;
 using ApiHealthDashboard.Services;
 using ApiHealthDashboard.State;
 using Microsoft.Extensions.Options;
@@ -45,6 +46,7 @@ builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 });
 builder.Services.AddHttpClient(nameof(EndpointPoller));
 builder.Services.AddSingleton<IEndpointPoller, EndpointPoller>();
+builder.Services.AddSingleton<IHealthResponseParser, HealthResponseParser>();
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
@@ -52,6 +54,7 @@ var app = builder.Build();
 _ = app.Services.GetRequiredService<DashboardConfig>();
 _ = app.Services.GetRequiredService<IEndpointStateStore>();
 _ = app.Services.GetRequiredService<IEndpointPoller>();
+_ = app.Services.GetRequiredService<IHealthResponseParser>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
