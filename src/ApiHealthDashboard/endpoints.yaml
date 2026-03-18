@@ -1,0 +1,30 @@
+dashboard:
+  refreshUiSeconds: 10
+  requestTimeoutSecondsDefault: 10
+  showRawPayload: true
+
+endpoints:
+  - id: orders-api
+    name: Orders API
+    url: https://orders.example.com/health
+    enabled: true
+    frequencySeconds: 30
+    timeoutSeconds: 10
+    headers:
+      X-API-Key: ${ORDERS_API_KEY}
+    includeChecks:
+      - self
+      - database
+      - redis
+    excludeChecks:
+      - optional-third-party
+
+  - id: billing-api
+    name: Billing API
+    url: https://billing.example.com/health
+    enabled: true
+    frequencySeconds: 60
+    timeoutSeconds: 15
+    headers: {}
+    includeChecks: []
+    excludeChecks: []

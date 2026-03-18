@@ -1,0 +1,157 @@
+@page "{id?}"
+@model ApiHealthDashboard.Pages.Endpoints.DetailsModel
+@{
+    ViewData["Title"] = "Endpoint Details";
+}
+
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">Endpoint Details</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a asp-page="/Index">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Endpoint Details</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-lg-4">
+                <div class="card card-primary card-outline">
+                    <div class="card-header">
+                        <h3 class="card-title">Endpoint Summary</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="metric-list">
+                            <div class="metric-item">
+                                <span class="metric-label">Endpoint Id</span>
+                                <div class="metric-value">@Model.EndpointId</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">URL</span>
+                                <div class="metric-value">https://api.internal.example/@Model.EndpointId/health</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Polling Frequency</span>
+                                <div class="metric-value">30 seconds</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Timeout</span>
+                                <div class="metric-value">10 seconds</div>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-label">Current Status</span>
+                                <div class="metric-value"><span class="badge badge-warning">Degraded</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        Header values and secrets will be summarized safely here once YAML loading is wired in.
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Latest Poll Snapshot</h3>
+                    </div>
+                    <div class="card-body">
+                        <strong>Last Checked</strong>
+                        <p class="text-muted">2026-03-18 09:14:12 UTC</p>
+                        <hr />
+                        <strong>Last Successful</strong>
+                        <p class="text-muted">2026-03-18 09:13:42 UTC</p>
+                        <hr />
+                        <strong>Duration</strong>
+                        <p class="text-muted">612 ms</p>
+                        <hr />
+                        <strong>Current Error</strong>
+                        <p class="text-muted mb-0">Downstream SQL dependency exceeded threshold.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Nested Health Checks</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="health-tree">
+                            <div class="timeline timeline-inverse">
+                                <div>
+                                    <i class="fas fa-server bg-primary"></i>
+                                    <div class="timeline-item">
+                                        <h3 class="timeline-header">
+                                            API root status
+                                            <span class="badge badge-warning">Degraded</span>
+                                        </h3>
+                                        <div class="timeline-body">
+                                            Overall endpoint response will be normalized into a recursive tree in Phase 6.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <i class="fas fa-database bg-success"></i>
+                                    <div class="timeline-item">
+                                        <h3 class="timeline-header">
+                                            database
+                                            <span class="badge badge-success">Healthy</span>
+                                        </h3>
+                                        <div class="timeline-body">
+                                            Connection check passed in 48 ms.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <i class="fas fa-network-wired bg-warning"></i>
+                                    <div class="timeline-item">
+                                        <h3 class="timeline-header">
+                                            downstream-services
+                                            <span class="badge badge-warning">Degraded</span>
+                                        </h3>
+                                        <div class="timeline-body">
+                                            Placeholder branch for nested checks:
+                                            cache healthy, messaging healthy, reporting slow.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <i class="far fa-clock bg-gray"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Raw Payload Preview</h3>
+                    </div>
+                    <div class="card-body">
+                        <pre class="payload-preview mb-0"><code>{
+  "status": "Degraded",
+  "entries": {
+    "database": { "status": "Healthy", "duration": "00:00:00.048" },
+    "downstream-services": {
+      "status": "Degraded",
+      "children": {
+        "cache": { "status": "Healthy" },
+        "messaging": { "status": "Healthy" },
+        "reporting": { "status": "Degraded" }
+      }
+    }
+  }
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

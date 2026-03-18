@@ -1,0 +1,223 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">Health Check Dashboard</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item active">Dashboard</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="dashboard-hero card card-outline card-primary">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <span class="hero-kicker">Phase 2 Placeholder</span>
+                        <h2 class="hero-title">Local AdminLTE shell for endpoint monitoring</h2>
+                        <p class="hero-copy mb-0">
+                            This page is the starting canvas for the live health overview. In later phases it will bind to YAML-driven
+                            endpoints, runtime polling state, and manual refresh actions.
+                        </p>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="hero-panel">
+                            <div class="hero-stat">
+                                <span class="hero-stat-label">Frontend assets</span>
+                                <strong>Bundled locally</strong>
+                            </div>
+                            <div class="hero-stat">
+                                <span class="hero-stat-label">UI style</span>
+                                <strong>AdminLTE + Razor Pages</strong>
+                            </div>
+                            <div class="hero-stat mb-0">
+                                <span class="hero-stat-label">Monitoring mode</span>
+                                <strong>Placeholder state</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-3 col-6">
+                <div class="small-box health-box bg-success">
+                    <div class="inner">
+                        <h3>18</h3>
+                        <p>Healthy Endpoints</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-6">
+                <div class="small-box health-box bg-warning">
+                    <div class="inner">
+                        <h3>3</h3>
+                        <p>Degraded Endpoints</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-6">
+                <div class="small-box health-box bg-danger">
+                    <div class="inner">
+                        <h3>1</h3>
+                        <p>Unhealthy Endpoints</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-radiation"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-6">
+                <div class="small-box health-box bg-secondary">
+                    <div class="inner">
+                        <h3>2</h3>
+                        <p>Unknown or Unreachable</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-question-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header border-0">
+                        <h3 class="card-title">Monitored Endpoints</h3>
+                        <div class="card-tools">
+                            <a href="#" class="btn btn-tool disabled" aria-disabled="true">Refresh All</a>
+                        </div>
+                    </div>
+                    <div class="card-body table-responsive p-0">
+                        <table class="table table-hover text-nowrap">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Status</th>
+                                    <th>Last Checked</th>
+                                    <th>Duration</th>
+                                    <th>Frequency</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Orders API</td>
+                                    <td><span class="badge badge-success">Healthy</span></td>
+                                    <td>09:15 UTC</td>
+                                    <td>184 ms</td>
+                                    <td>30 sec</td>
+                                    <td class="text-right">
+                                        <a asp-page="/Endpoints/Details" asp-route-id="orders-api" class="btn btn-sm btn-outline-primary">Details</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Billing API</td>
+                                    <td><span class="badge badge-warning">Degraded</span></td>
+                                    <td>09:14 UTC</td>
+                                    <td>612 ms</td>
+                                    <td>60 sec</td>
+                                    <td class="text-right">
+                                        <a asp-page="/Endpoints/Details" asp-route-id="billing-api" class="btn btn-sm btn-outline-primary">Details</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Identity API</td>
+                                    <td><span class="badge badge-danger">Unhealthy</span></td>
+                                    <td>09:14 UTC</td>
+                                    <td>1,408 ms</td>
+                                    <td>45 sec</td>
+                                    <td class="text-right">
+                                        <a asp-page="/Endpoints/Details" asp-route-id="identity-api" class="btn btn-sm btn-outline-primary">Details</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Notifications API</td>
+                                    <td><span class="badge badge-secondary">Unknown</span></td>
+                                    <td>Never</td>
+                                    <td>-</td>
+                                    <td>120 sec</td>
+                                    <td class="text-right">
+                                        <a asp-page="/Endpoints/Details" asp-route-id="notifications-api" class="btn btn-sm btn-outline-primary">Details</a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card card-outline card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">Build Progress</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress-group">
+                            Layout and shell
+                            <span class="float-right"><b>Done</b></span>
+                            <div class="progress progress-sm">
+                                <div class="progress-bar bg-primary" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        <div class="progress-group">
+                            YAML configuration
+                            <span class="float-right"><b>Next</b></span>
+                            <div class="progress progress-sm">
+                                <div class="progress-bar bg-info" style="width: 20%"></div>
+                            </div>
+                        </div>
+                        <div class="progress-group">
+                            Polling and parser
+                            <span class="float-right"><b>Planned</b></span>
+                            <div class="progress progress-sm">
+                                <div class="progress-bar bg-secondary" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Expected Summary Signals</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="todo-list endpoint-notes" data-widget="todo-list">
+                            <li>
+                                <span class="text">Per-endpoint polling frequency and timeout</span>
+                            </li>
+                            <li>
+                                <span class="text">Last checked and last successful timestamps</span>
+                            </li>
+                            <li>
+                                <span class="text">Current error state and response duration</span>
+                            </li>
+                            <li>
+                                <span class="text">Quick link into recursive endpoint details</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

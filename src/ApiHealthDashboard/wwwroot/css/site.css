@@ -1,0 +1,159 @@
+:root {
+  --health-primary: #1f4b99;
+  --health-accent: #0f9d8a;
+  --health-surface: #f4f6f9;
+  --health-ink: #1f2937;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  color: var(--health-ink);
+  background:
+    radial-gradient(circle at top right, rgba(31, 75, 153, 0.12), transparent 22rem),
+    linear-gradient(180deg, #f9fbfd 0%, var(--health-surface) 100%);
+}
+
+.content-wrapper {
+  background: transparent;
+}
+
+.sidebar-avatar {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--health-primary), var(--health-accent));
+}
+
+.dashboard-hero {
+  overflow: hidden;
+  border-radius: 1rem;
+  background:
+    linear-gradient(135deg, rgba(31, 75, 153, 0.96), rgba(15, 157, 138, 0.92)),
+    linear-gradient(180deg, #0e223f, #0f9d8a);
+  color: #fff;
+}
+
+.hero-kicker {
+  display: inline-block;
+  margin-bottom: 0.85rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hero-title {
+  margin-bottom: 0.75rem;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.hero-copy {
+  max-width: 44rem;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.hero-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: rgba(7, 14, 29, 0.18);
+  backdrop-filter: blur(2px);
+}
+
+.hero-stat {
+  margin-bottom: 0.9rem;
+}
+
+.hero-stat-label {
+  display: block;
+  margin-bottom: 0.1rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.76);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.health-box {
+  border-radius: 0.85rem;
+}
+
+.endpoint-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem 0;
+}
+
+.endpoint-notes li {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.endpoint-notes li:last-child {
+  border-bottom: 0;
+}
+
+.metric-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.metric-item {
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  background: rgba(31, 75, 153, 0.06);
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.metric-value {
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.health-tree .timeline > div > .timeline-item {
+  border-radius: 0.75rem;
+}
+
+.health-tree .timeline-header .badge {
+  margin-left: 0.5rem;
+}
+
+.health-tree .timeline-body {
+  color: #4b5563;
+}
+
+.payload-preview {
+  min-height: 13rem;
+  padding: 1rem;
+  border-radius: 0.85rem;
+  color: #e5edf8;
+  background: #142033;
+}
+
+.payload-preview code {
+  color: inherit;
+}
+
+@media (max-width: 991.98px) {
+  .hero-title {
+    font-size: 1.65rem;
+  }
+}
