@@ -194,6 +194,14 @@ Test file:
 - [ ] Phase 13 - Publish and deployment validation
 - [ ] Phase 14 - GitHub Actions CI/CD
 
+## Future Plans
+
+These are planned enhancements after the current v1 path:
+- add an import flow that can derive YAML endpoint config from API request and response inspection, with preview and diff comparison before any manual save
+- add CLI execution with machine-readable output for automation and scripting scenarios
+- allow per-endpoint priority so important endpoints can be surfaced and scheduled differently
+- optionally allow email sending, either through direct SMTP configuration or by calling an external API
+
 ## Notes For Ongoing Updates
 
 This README is intended to evolve with the project. As new phases land, we should keep these sections current:

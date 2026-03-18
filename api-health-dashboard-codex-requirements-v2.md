@@ -784,6 +784,10 @@ These are optional later improvements and should not block v1:
 - tag-based filtering
 - retry policy with backoff
 - readonly config viewer page
+- import YAML endpoint definitions from API endpoint request/response inspection with preview and diff comparison before manual file save
+- CLI execution mode with machine-readable output for automation workflows
+- per-endpoint priority for display and future scheduling behavior
+- optional email sending via directly configured SMTP or an external API integration
 
 ---
 

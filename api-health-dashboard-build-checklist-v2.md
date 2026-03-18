@@ -662,6 +662,10 @@ These should not block v1.
 - [ ] health status mini charts
 - [ ] SBOM generation
 - [ ] artifact signing
+- [ ] import YAML endpoint definitions from API endpoint request/response inspection with preview and diff comparison before manual save
+- [ ] CLI execution mode with machine-readable output
+- [ ] per-endpoint priority support
+- [ ] optional email sending via SMTP or an external API
 
 ---
 
