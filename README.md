@@ -26,6 +26,7 @@ Implemented so far:
 - Phase 11: error handling and structured logging improvements
 - Phase 12: automated test expansion for invalid and edge-case coverage
 - Phase 13: publish and deployment validation
+- Phase 14: GitHub Actions CI/CD and Dependabot automation
 
 Not implemented yet:
 - CI/CD workflows
@@ -230,6 +231,23 @@ Validated deployment behavior:
 - no database package or runtime dependency is required
 - no Node.js, npm, yarn, or frontend build tool dependency is required
 
+### GitHub Actions And Dependabot
+
+The repository now includes automation for CI, CodeQL scanning, release packaging, and dependency updates.
+
+Current automation files:
+- [`.github/workflows/ci-build.yml`](.github/workflows/ci-build.yml)
+- [`.github/workflows/sast-scan.yml`](.github/workflows/sast-scan.yml)
+- [`.github/workflows/release.yml`](.github/workflows/release.yml)
+- [`.github/dependabot.yml`](.github/dependabot.yml)
+
+Current automation behavior:
+- CI runs on pushes to `main` and `develop`, and on pull requests targeting those branches
+- CI restores, builds in Release mode, runs tests, and uploads TRX test results
+- CodeQL runs for C# on pushes to `main`, pull requests targeting `main`, and manual dispatches
+- Release automation verifies the solution, publishes self-contained artifacts for `win-x64` and `linux-x64`, packages them, and uploads them to the GitHub release
+- Dependabot monitors both NuGet dependencies and GitHub Actions workflow dependencies on a weekly schedule
+
 ## Running The App
 
 From the repository root:
@@ -273,6 +291,17 @@ Deployment notes:
 - the published folder is runnable on its own with the included `endpoints.yaml`
 - local UI assets under `wwwroot/adminlte` remain bundled after publish
 - no additional database or Node.js setup is required for the published app
+
+## CI/CD Automation
+
+Repository automation now includes:
+- CI build and test workflow for `main` and `develop`
+- CodeQL SAST workflow for C#
+- release packaging workflow for self-contained GitHub release artifacts
+- Dependabot configuration for NuGet and GitHub Actions dependencies
+
+Local note:
+- the workflow files were added and reviewed locally, and the application build still passes, but this shell environment does not include a YAML workflow linter for direct execution-free validation
 
 Current automated coverage includes:
 - valid YAML load
@@ -351,7 +380,7 @@ Test file:
 - [x] Phase 11 - Error handling and logging
 - [x] Phase 12 - Automated tests expansion
 - [x] Phase 13 - Publish and deployment validation
-- [ ] Phase 14 - GitHub Actions CI/CD
+- [x] Phase 14 - GitHub Actions CI/CD
 
 ## Future Plans
 

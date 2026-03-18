@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify Release Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore ApiHealthDashboard.sln
+
+      - name: Build solution
+        run: dotnet build ApiHealthDashboard.sln -c Release --no-restore
+
+      - name: Run tests
+        run: dotnet test ApiHealthDashboard.sln -c Release --no-build
+
+  publish:
+    name: Publish ${{ matrix.runtime }}
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: win-x64
+            archive_extension: zip
+          - runtime: linux-x64
+            archive_extension: tar.gz
+
+    env:
+      PROJECT_PATH: src/ApiHealthDashboard/ApiHealthDashboard.csproj
+      RELEASE_VERSION: ${{ github.event.release.tag_name || github.ref_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish self-contained app
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -r ${{ matrix.runtime }} --self-contained true -o ./artifacts/publish/${{ matrix.runtime }}
+
+      - name: Package Windows artifact
+        if: ${{ matrix.archive_extension == 'zip' }}
+        shell: pwsh
+        run: Compress-Archive -Path "./artifacts/publish/${{ matrix.runtime }}/*" -DestinationPath "./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.zip" -Force
+
+      - name: Package Linux artifact
+        if: ${{ matrix.archive_extension == 'tar.gz' }}
+        run: tar -C "./artifacts/publish/${{ matrix.runtime }}" -czf "./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.tar.gz" .
+
+      - name: Upload packaged artifact to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.runtime }}
+          path: ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}
+          if-no-files-found: error
+
+      - name: Upload artifact to GitHub Release
+        if: ${{ github.event_name == 'release' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}
+          fail_on_unmatched_files: true
