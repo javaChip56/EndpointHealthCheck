@@ -7,7 +7,7 @@ This project is being built to:
 - parse JSON health responses without Xabaril UI libraries
 - render a local-only AdminLTE dashboard
 - load endpoint definitions from YAML
-- keep runtime state in memory
+- keep active runtime state in memory with optional per-endpoint file persistence for current state
 - stay portable for internal and restricted environments
 
 ## Current Status
@@ -30,6 +30,7 @@ Implemented so far:
 - Post-v1: endpoint import flow with live probe, YAML preview, and diff comparison
 - Post-v1: CLI execution mode with JSON/XML reporting
 - Post-v1: YAML hot-reload for dashboard and endpoint files
+- Post-v1: per-endpoint current-state persistence with compact JSON files
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -101,7 +102,7 @@ Validation currently checks:
 
 ### Runtime State Store
 
-The app now includes an in-memory endpoint state store for current runtime status.
+The app now includes a runtime endpoint state store with an in-memory cache and optional per-endpoint current-state persistence.
 
 Current runtime models:
 - [`src/ApiHealthDashboard/Domain/EndpointState.cs`](src/ApiHealthDashboard/Domain/EndpointState.cs)
@@ -111,10 +112,14 @@ Current runtime models:
 State store components:
 - [`src/ApiHealthDashboard/State/IEndpointStateStore.cs`](src/ApiHealthDashboard/State/IEndpointStateStore.cs)
 - [`src/ApiHealthDashboard/State/InMemoryEndpointStateStore.cs`](src/ApiHealthDashboard/State/InMemoryEndpointStateStore.cs)
+- [`src/ApiHealthDashboard/State/FileBackedEndpointStateStore.cs`](src/ApiHealthDashboard/State/FileBackedEndpointStateStore.cs)
+- [`src/ApiHealthDashboard/Configuration/RuntimeStateOptions.cs`](src/ApiHealthDashboard/Configuration/RuntimeStateOptions.cs)
 
 Current behavior:
 - initializes one runtime state entry per configured endpoint at startup
-- stores endpoint state in memory only
+- keeps active runtime state in memory for fast reads by pages and the scheduler
+- can persist the latest current state for each endpoint to a compact JSON file under a configurable runtime-state directory
+- restores persisted current state on startup for configured endpoints and resets any stale `IsPolling` flag to `false`
 - supports get-all, get-one, upsert, and reinitialize operations
 - returns deep copies so callers cannot mutate internal store state accidentally
 - uses thread-safe locking for concurrent access
@@ -314,6 +319,8 @@ The app reads the dashboard YAML path from the `Bootstrap:DashboardConfigPath` s
 
 The current primary setting is `Bootstrap:DashboardConfigPath`. `Bootstrap:EndpointsConfigPath` is still accepted as a legacy fallback.
 
+Runtime state persistence is configured through `RuntimeState:Enabled` and `RuntimeState:DirectoryPath` in the same appsettings files. By default, the app writes compact per-endpoint current-state files under `runtime-state/endpoints` relative to the app content root.
+
 You can also override it with an environment variable:
 
 ```powershell
@@ -483,10 +490,9 @@ Test file:
 
 These are planned enhancements after the current v1 path:
 - optionally add short status history and mini trends so the dashboard can show recent health changes instead of only the latest snapshot
-- optionally persist runtime state to compact per-endpoint files while keeping the active runtime cache in memory
-- store persisted endpoint state outside the YAML config area so runtime data stays separate from configuration hot-reload inputs
 - add configurable retention controls for persisted runtime data, including cleanup of old history files and orphaned endpoint state files
 - make runtime data cleanup best-effort and time-based, such as deleting eligible files older than a configured number of hours
+- optionally add per-endpoint history files or embedded `recentSamples` arrays once trend capture is introduced
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API
 
 ## Notes For Ongoing Updates

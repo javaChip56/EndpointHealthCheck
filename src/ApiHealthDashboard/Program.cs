@@ -27,6 +27,8 @@ builder.Services.Configure<DashboardBootstrapOptions>(
     builder.Configuration.GetSection(DashboardBootstrapOptions.SectionName));
 builder.Services.Configure<ImportUiOptions>(
     builder.Configuration.GetSection(ImportUiOptions.SectionName));
+builder.Services.Configure<RuntimeStateOptions>(
+    builder.Configuration.GetSection(RuntimeStateOptions.SectionName));
 builder.Services.AddSingleton<DashboardConfigValidator>();
 builder.Services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 builder.Services.AddSingleton(static serviceProvider =>
@@ -77,15 +79,34 @@ builder.Services.AddSingleton(static serviceProvider =>
 builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<DashboardConfig>();
+    var environment = serviceProvider.GetRequiredService<IHostEnvironment>();
     var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
         .CreateLogger("ApiHealthDashboard.State");
-    var store = new InMemoryEndpointStateStore(config.Endpoints);
+    var runtimeStateOptions = serviceProvider.GetRequiredService<IOptions<RuntimeStateOptions>>().Value;
+
+    if (!runtimeStateOptions.Enabled)
+    {
+        var inMemoryStore = new InMemoryEndpointStateStore(config.Endpoints);
+
+        logger.LogInformation(
+            "Initialized in-memory endpoint state store with {EndpointCount} configured endpoints.",
+            inMemoryStore.GetAll().Count);
+
+        return inMemoryStore;
+    }
+
+    var resolvedStateDirectory = runtimeStateOptions.ResolveDirectoryPath(environment.ContentRootPath);
+    var fileBackedStore = new FileBackedEndpointStateStore(
+        config.Endpoints,
+        resolvedStateDirectory,
+        serviceProvider.GetRequiredService<ILogger<FileBackedEndpointStateStore>>());
 
     logger.LogInformation(
-        "Initialized endpoint state store with {EndpointCount} configured endpoints.",
-        store.GetAll().Count);
+        "Initialized file-backed endpoint state store with {EndpointCount} configured endpoints in {StateDirectoryPath}.",
+        fileBackedStore.GetAll().Count,
+        resolvedStateDirectory);
 
-    return store;
+    return fileBackedStore;
 });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient(nameof(EndpointPoller));

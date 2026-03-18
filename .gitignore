@@ -36,6 +36,7 @@ bld/
 **/obj/
 [Ll]og/
 [Ll]ogs/
+src/ApiHealthDashboard/runtime-state/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
