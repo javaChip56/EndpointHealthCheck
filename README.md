@@ -29,7 +29,7 @@ Implemented so far:
 - Phase 14: GitHub Actions CI/CD and Dependabot automation
 
 Not implemented yet:
-- CI/CD workflows
+- Backlog items tracked for post-v1 work
 
 ## Solution Layout
 
@@ -47,7 +47,8 @@ Not implemented yet:
 |       |-- State/
 |       |-- Pages/
 |       |-- wwwroot/
-|       `-- endpoints.yaml
+|       |-- dashboard.yaml
+|       `-- endpoints/
 `-- tests/
     `-- ApiHealthDashboard.Tests/
 ```
@@ -72,16 +73,18 @@ Current UI pages:
 
 ### YAML Configuration
 
-Dashboard configuration is loaded at startup from [`src/ApiHealthDashboard/endpoints.yaml`](src/ApiHealthDashboard/endpoints.yaml).
+Dashboard configuration is loaded at startup from [`src/ApiHealthDashboard/dashboard.yaml`](src/ApiHealthDashboard/dashboard.yaml).
 
 Current configuration support:
 - `dashboard.refreshUiSeconds`
 - `dashboard.requestTimeoutSecondsDefault`
 - `dashboard.showRawPayload`
+- `dashboard.endpointFiles` for loading endpoints from one or more separate YAML files
 - endpoint `id`, `name`, `url`, `enabled`, `frequencySeconds`, `timeoutSeconds`
 - endpoint `headers`, `includeChecks`, `excludeChecks`
 - `${ENV_VAR}` substitution in YAML values
-- `endpoints.yaml` is copied to both build and publish output by default
+- endpoint definitions can be kept inline in `dashboard.yaml` or split into multiple files under [`src/ApiHealthDashboard/endpoints`](src/ApiHealthDashboard/endpoints)
+- project YAML files are copied to both build and publish output by default
 
 Validation currently checks:
 - required endpoint id, name, and url
@@ -179,6 +182,7 @@ The dashboard home page now acts as an operational summary instead of a transiti
 Current dashboard behavior:
 - shows configured, enabled, disabled, and actively polling endpoint counts
 - highlights healthy, degraded, unhealthy, and unknown totals in summary cards
+- includes a client-side search field for filtering endpoint rows by name, id, status, or error text
 - renders a live endpoint table with last check, duration, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
 - shows a clearer empty state when no endpoints are configured
@@ -225,7 +229,7 @@ The app has now been validated as a portable publishable deployment, not just a 
 Validated deployment behavior:
 - framework-dependent publish completes successfully
 - self-contained Windows `win-x64` publish completes successfully
-- published output includes `endpoints.yaml`, `appsettings.json`, and bundled local AdminLTE assets
+- published output includes `dashboard.yaml`, endpoint YAML files, `appsettings.json`, and bundled local AdminLTE assets
 - both published variants run directly from their publish folders and return HTTP `200` for `/`
 - bundled CSS assets load from the published folders without relying on external CDNs
 - no database package or runtime dependency is required
@@ -256,14 +260,16 @@ From the repository root:
 dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj
 ```
 
-The app reads the YAML path from the `Bootstrap:EndpointsConfigPath` setting in:
+The app reads the dashboard YAML path from the `Bootstrap:DashboardConfigPath` setting in:
 - [`src/ApiHealthDashboard/appsettings.json`](src/ApiHealthDashboard/appsettings.json)
 - [`src/ApiHealthDashboard/appsettings.Development.json`](src/ApiHealthDashboard/appsettings.Development.json)
+
+The current primary setting is `Bootstrap:DashboardConfigPath`. `Bootstrap:EndpointsConfigPath` is still accepted as a legacy fallback.
 
 You can also override it with an environment variable:
 
 ```powershell
-$env:APIHEALTHDASHBOARD_BOOTSTRAP__ENDPOINTSCONFIGPATH="D:\path\to\endpoints.yaml"
+$env:APIHEALTHDASHBOARD_BOOTSTRAP__DASHBOARDCONFIGPATH="D:\path\to\dashboard.yaml"
 dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj
 ```
 
@@ -288,7 +294,7 @@ dotnet publish .\src\ApiHealthDashboard\ApiHealthDashboard.csproj -c Release -r 
 ```
 
 Deployment notes:
-- the published folder is runnable on its own with the included `endpoints.yaml`
+- the published folder is runnable on its own with the included `dashboard.yaml` and endpoint YAML files
 - local UI assets under `wwwroot/adminlte` remain bundled after publish
 - no additional database or Node.js setup is required for the published app
 

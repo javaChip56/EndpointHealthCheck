@@ -194,6 +194,34 @@ body {
   white-space: normal;
 }
 
+.dashboard-card-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.endpoint-search-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.endpoint-search-group {
+  flex: 1 1 18rem;
+  min-width: 18rem;
+}
+
+.endpoint-search-count {
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+.dashboard-refresh-all-form {
+  margin-bottom: 0;
+}
+
 .dashboard-empty-state-compact {
   min-height: 12rem;
   padding: 1.5rem;
@@ -314,5 +342,18 @@ body {
 @media (max-width: 991.98px) {
   .hero-title {
     font-size: 1.65rem;
+  }
+
+  .endpoint-search-tools {
+    width: 100%;
+  }
+
+  .endpoint-search-group {
+    min-width: 100%;
+  }
+
+  .endpoint-search-count {
+    min-width: auto;
+    text-align: left;
   }
 }
