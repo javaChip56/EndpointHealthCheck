@@ -1,4 +1,5 @@
 using ApiHealthDashboard.Configuration;
+using ApiHealthDashboard.State;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,11 +29,25 @@ builder.Services.AddSingleton(static serviceProvider =>
 
     return config;
 });
+builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
+{
+    var config = serviceProvider.GetRequiredService<DashboardConfig>();
+    var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("ApiHealthDashboard.State");
+    var store = new InMemoryEndpointStateStore(config.Endpoints);
+
+    logger.LogInformation(
+        "Initialized endpoint state store with {EndpointCount} configured endpoints.",
+        store.GetAll().Count);
+
+    return store;
+});
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
 
 _ = app.Services.GetRequiredService<DashboardConfig>();
+_ = app.Services.GetRequiredService<IEndpointStateStore>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

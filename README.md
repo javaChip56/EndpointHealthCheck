@@ -16,9 +16,9 @@ Implemented so far:
 - Phase 1: solution bootstrap
 - Phase 2: local AdminLTE layout and placeholder pages
 - Phase 3: YAML configuration models, loader, validation, and tests
+- Phase 4: in-memory runtime state store and tests
 
 Not implemented yet:
-- runtime state store
 - endpoint polling
 - health response parsing
 - scheduler
@@ -84,6 +84,26 @@ Validation currently checks:
 - positive refresh, frequency, and timeout values
 - non-empty header names
 
+### Runtime State Store
+
+The app now includes an in-memory endpoint state store for current runtime status.
+
+Current runtime models:
+- [`src/ApiHealthDashboard/Domain/EndpointState.cs`](src/ApiHealthDashboard/Domain/EndpointState.cs)
+- [`src/ApiHealthDashboard/Domain/HealthSnapshot.cs`](src/ApiHealthDashboard/Domain/HealthSnapshot.cs)
+- [`src/ApiHealthDashboard/Domain/HealthNode.cs`](src/ApiHealthDashboard/Domain/HealthNode.cs)
+
+State store components:
+- [`src/ApiHealthDashboard/State/IEndpointStateStore.cs`](src/ApiHealthDashboard/State/IEndpointStateStore.cs)
+- [`src/ApiHealthDashboard/State/InMemoryEndpointStateStore.cs`](src/ApiHealthDashboard/State/InMemoryEndpointStateStore.cs)
+
+Current behavior:
+- initializes one runtime state entry per configured endpoint at startup
+- stores endpoint state in memory only
+- supports get-all, get-one, upsert, and reinitialize operations
+- returns deep copies so callers cannot mutate internal store state accidentally
+- uses thread-safe locking for concurrent access
+
 ## Running The App
 
 From the repository root:
@@ -115,9 +135,14 @@ Current automated coverage includes:
 - duplicate endpoint id validation
 - invalid value aggregation
 - environment variable substitution
+- runtime state initialization
+- runtime state upsert and deep-copy safety
+- runtime state reinitialization
+- runtime state concurrent update behavior
 
 Test file:
 - [`tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs`](tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs)
+- [`tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs`](tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs)
 
 ## Important Constraints
 
@@ -132,7 +157,7 @@ Test file:
 - [x] Phase 1 - Solution bootstrap
 - [x] Phase 2 - Local AdminLTE integration
 - [x] Phase 3 - YAML configuration loader
-- [ ] Phase 4 - Runtime state store
+- [x] Phase 4 - Runtime state store
 - [ ] Phase 5 - HTTP poller
 - [ ] Phase 6 - Health response parser
 - [ ] Phase 7 - Polling scheduler
