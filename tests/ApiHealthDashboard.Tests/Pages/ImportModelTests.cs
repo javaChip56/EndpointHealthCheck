@@ -3,6 +3,7 @@ using ApiHealthDashboard.Pages;
 using ApiHealthDashboard.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ApiHealthDashboard.Tests.Pages;
@@ -35,6 +36,10 @@ public sealed class ImportModelTests
         var model = new ImportModel(
             new DashboardConfig(),
             new StubEndpointImportService(importResult),
+            Options.Create(new ImportUiOptions
+            {
+                MinimumRecommendedPollFrequencySeconds = 180
+            }),
             NullLogger<ImportModel>.Instance)
         {
             Input = new ImportModel.InputModel
@@ -50,6 +55,7 @@ public sealed class ImportModelTests
         Assert.NotNull(model.Result);
         Assert.Equal("orders-api", model.Input.Id);
         Assert.Equal("Orders API", model.Input.Name);
+        Assert.Equal("Poll frequency below the recommended soft limit of 180 seconds may create unnecessary load.", model.FrequencyRecommendationWarning);
     }
 
     [Fact]
@@ -72,6 +78,10 @@ public sealed class ImportModelTests
                 ProbeStatusText = string.Empty,
                 MatchSummary = string.Empty
             }),
+            Options.Create(new ImportUiOptions
+            {
+                MinimumRecommendedPollFrequencySeconds = 180
+            }),
             NullLogger<ImportModel>.Instance)
         {
             Input = new ImportModel.InputModel
@@ -86,6 +96,7 @@ public sealed class ImportModelTests
         Assert.IsType<PageResult>(result);
         Assert.False(model.ModelState.IsValid);
         Assert.Null(model.Result);
+        Assert.Equal("Poll frequency below the recommended soft limit of 180 seconds may create unnecessary load.", model.FrequencyRecommendationWarning);
     }
 
     private sealed class StubEndpointImportService : IEndpointImportService

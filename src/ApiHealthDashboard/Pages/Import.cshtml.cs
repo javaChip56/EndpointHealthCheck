@@ -3,6 +3,7 @@ using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 
 namespace ApiHealthDashboard.Pages;
 
@@ -10,15 +11,18 @@ public sealed class ImportModel : PageModel
 {
     private readonly DashboardConfig _dashboardConfig;
     private readonly IEndpointImportService _endpointImportService;
+    private readonly ImportUiOptions _importUiOptions;
     private readonly ILogger<ImportModel> _logger;
 
     public ImportModel(
         DashboardConfig dashboardConfig,
         IEndpointImportService endpointImportService,
+        IOptions<ImportUiOptions> importUiOptions,
         ILogger<ImportModel> logger)
     {
         _dashboardConfig = dashboardConfig;
         _endpointImportService = endpointImportService;
+        _importUiOptions = importUiOptions.Value;
         _logger = logger;
     }
 
@@ -31,6 +35,10 @@ public sealed class ImportModel : PageModel
 
     public bool HasExistingEndpoints => ExistingEndpointCount > 0;
 
+    public int MinimumRecommendedPollFrequencySeconds => Math.Max(_importUiOptions.MinimumRecommendedPollFrequencySeconds, 1);
+
+    public string? FrequencyRecommendationWarning { get; private set; }
+
     public void OnGet()
     {
         InitializeDefaults();
@@ -39,6 +47,7 @@ public sealed class ImportModel : PageModel
     public async Task<IActionResult> OnPostPreviewAsync(CancellationToken cancellationToken)
     {
         InitializeDefaults();
+        UpdateFrequencyRecommendationWarning();
 
         if (!ValidateInput())
         {
@@ -88,8 +97,15 @@ public sealed class ImportModel : PageModel
     {
         if (Input.FrequencySeconds <= 0)
         {
-            Input.FrequencySeconds = 30;
+            Input.FrequencySeconds = MinimumRecommendedPollFrequencySeconds;
         }
+    }
+
+    private void UpdateFrequencyRecommendationWarning()
+    {
+        FrequencyRecommendationWarning = Input.FrequencySeconds < MinimumRecommendedPollFrequencySeconds
+            ? $"Poll frequency below the recommended soft limit of {MinimumRecommendedPollFrequencySeconds} seconds may create unnecessary load."
+            : null;
     }
 
     private bool ValidateInput()

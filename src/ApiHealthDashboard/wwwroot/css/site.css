@@ -244,6 +244,10 @@ body {
   display: none;
 }
 
+.import-soft-warning {
+  border-radius: 0.85rem;
+}
+
 .import-form {
   display: grid;
   gap: 1.15rem;
@@ -341,6 +345,19 @@ body {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.import-code-block code {
+  display: block;
+  white-space: inherit;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.import-response-preview {
+  max-height: 32rem;
+  overflow: auto;
+  line-height: 1.65;
 }
 
 .import-diff-block {

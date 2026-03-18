@@ -12,6 +12,8 @@ builder.Configuration.AddEnvironmentVariables(prefix: "APIHEALTHDASHBOARD_");
 // Add services to the container.
 builder.Services.Configure<DashboardBootstrapOptions>(
     builder.Configuration.GetSection(DashboardBootstrapOptions.SectionName));
+builder.Services.Configure<ImportUiOptions>(
+    builder.Configuration.GetSection(ImportUiOptions.SectionName));
 builder.Services.AddSingleton<DashboardConfigValidator>();
 builder.Services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 builder.Services.AddSingleton(static serviceProvider =>

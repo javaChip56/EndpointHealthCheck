@@ -79,6 +79,12 @@
                                 </ul>
                             </div>
                         }
+                        @if (!string.IsNullOrWhiteSpace(Model.FrequencyRecommendationWarning))
+                        {
+                            <div class="alert alert-warning import-soft-warning" role="alert">
+                                @Model.FrequencyRecommendationWarning
+                            </div>
+                        }
 
                         <form method="post" asp-page-handler="Preview" class="import-form">
                             <div class="import-form-section">
@@ -106,6 +112,7 @@
                                     <div class="form-group col-md-6">
                                         <label asp-for="Input.FrequencySeconds">Poll frequency (sec)</label>
                                         <input asp-for="Input.FrequencySeconds" class="form-control" />
+                                        <small class="form-text text-muted">Recommended minimum: @Model.MinimumRecommendedPollFrequencySeconds seconds.</small>
                                     </div>
                                     <div class="form-group col-md-6">
                                         <label asp-for="Input.TimeoutSeconds">Timeout (sec)</label>
@@ -361,7 +368,7 @@
                                     <p class="text-muted">The response preview was truncated for display.</p>
                                 }
 
-                                <pre class="import-code-block"><code>@Model.Result.ResponsePreview</code></pre>
+                                <pre class="import-code-block import-response-preview"><code>@Model.Result.ResponsePreview</code></pre>
                             }
                             else
                             {

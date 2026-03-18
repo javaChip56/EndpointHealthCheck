@@ -185,6 +185,7 @@ Current dashboard behavior:
 - shows configured, enabled, disabled, and actively polling endpoint counts
 - highlights healthy, degraded, unhealthy, and unknown totals in summary cards
 - includes a client-side search field for filtering endpoint rows by name, id, status, or error text
+- refreshes the live dashboard section with same-origin timed GET requests instead of reloading the whole page
 - renders a live endpoint table with last check, duration, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
 - shows a clearer empty state when no endpoints are configured
@@ -196,6 +197,7 @@ The app now includes an endpoint import preview flow for deriving YAML from a li
 Current import behavior:
 - sends a live request using the entered URL, headers, timeout, and enabled/frequency settings
 - auto-suggests endpoint id and name when those fields are left blank
+- shows a soft warning when the chosen poll frequency is below the configured appsettings recommendation
 - parses discovered checks from the response and can optionally populate `includeChecks`
 - generates a normalized YAML snippet for manual copy into `dashboard.yaml` or a separate endpoint file
 - compares the generated YAML against the currently loaded config when an existing endpoint matches by id or URL

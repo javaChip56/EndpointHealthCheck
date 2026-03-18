@@ -124,6 +124,35 @@ public sealed class EndpointImportServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_WithJsonResponse_PrettyPrintsResponsePreview()
+    {
+        var service = new EndpointImportService(
+            new DashboardConfig(),
+            new StubEndpointPoller(new PollResult
+            {
+                Kind = PollResultKind.Success,
+                DurationMs = 25,
+                ResponseBody = "{\"status\":\"Healthy\",\"checks\":{\"db\":{\"status\":\"Healthy\"}}}"
+            }),
+            new StubHealthResponseParser(new HealthSnapshot
+            {
+                OverallStatus = "Healthy"
+            }),
+            NullLogger<EndpointImportService>.Instance);
+
+        var result = await service.ImportAsync(
+            new EndpointImportRequest
+            {
+                Url = "https://orders.example.com/health",
+                FrequencySeconds = 180
+            },
+            CancellationToken.None);
+
+        Assert.Contains("\n", result.ResponsePreview.Replace("\r\n", "\n", StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Contains("\"status\": \"Healthy\"", result.ResponsePreview, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ImportAsync_WithHttpNotFound_DoesNotGenerateYamlPreview()
     {
         var service = new EndpointImportService(

@@ -4,6 +4,7 @@ using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
 namespace ApiHealthDashboard.Pages;
 
@@ -34,9 +35,22 @@ public class IndexModel : PageModel
 
     public bool HasConfiguredEndpoints => Endpoints.Count > 0;
 
+    public int RefreshUiSeconds => _dashboardConfig.Dashboard.RefreshUiSeconds;
+
     public void OnGet()
     {
         LoadDashboard();
+    }
+
+    public IActionResult OnGetLiveSection()
+    {
+        LoadDashboard();
+
+        return new PartialViewResult
+        {
+            ViewName = "_DashboardLiveSection",
+            ViewData = new ViewDataDictionary<IndexModel>(ViewData, this)
+        };
     }
 
     public async Task<IActionResult> OnPostRefreshAllAsync(CancellationToken cancellationToken)

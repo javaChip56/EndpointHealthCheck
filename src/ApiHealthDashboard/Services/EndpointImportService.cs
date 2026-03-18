@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Parsing;
@@ -239,14 +240,39 @@ public sealed class EndpointImportService : IEndpointImportService
             return string.Empty;
         }
 
-        if (responseBody.Length <= ResponsePreviewLimit)
+        var formattedResponse = FormatResponsePreview(responseBody);
+
+        if (formattedResponse.Length <= ResponsePreviewLimit)
         {
             truncated = false;
-            return responseBody;
+            return formattedResponse;
         }
 
         truncated = true;
-        return responseBody[..ResponsePreviewLimit];
+        return formattedResponse[..ResponsePreviewLimit];
+    }
+
+    private static string FormatResponsePreview(string responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            return responseBody;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            return JsonSerializer.Serialize(
+                document.RootElement,
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+        }
+        catch (JsonException)
+        {
+            return responseBody;
+        }
     }
 
     private static string? TryGetParserError(HealthSnapshot? snapshot)
