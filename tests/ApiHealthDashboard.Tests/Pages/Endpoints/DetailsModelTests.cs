@@ -148,7 +148,9 @@ public sealed class DetailsModelTests
         Assert.Equal(["database"], model.Endpoint.IncludeChecks);
         Assert.Equal(["cache"], model.Endpoint.ExcludeChecks);
         Assert.Equal(2, model.Endpoint.SnapshotMetadata.Count);
-        Assert.Equal("{\"status\":\"Degraded\"}", model.Endpoint.RawPayload);
+        Assert.Equal(
+            "{\n  \"status\": \"Degraded\"\n}",
+            model.Endpoint.RawPayload!.Replace("\r\n", "\n", StringComparison.Ordinal));
     }
 
     [Fact]

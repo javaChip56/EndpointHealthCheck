@@ -257,8 +257,19 @@
                         <div class="card-body">
                             @if (Model.Result.HasGeneratedYamlPreview)
                             {
-                                <p class="text-muted">Copy this into <code>dashboard.yaml</code> or an endpoint YAML file after review.</p>
-                                <pre class="import-code-block"><code>@Model.Result.GeneratedYaml</code></pre>
+                                <div class="import-preview-header">
+                                    <p class="text-muted mb-0">Copy this into <code>dashboard.yaml</code> or an endpoint YAML file after review.</p>
+                                    <div class="import-preview-actions">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                data-copy-target="#generated-yaml-preview"
+                                                data-copy-feedback="#generated-yaml-copy-feedback">
+                                            <i class="fas fa-copy mr-1"></i>Copy YAML
+                                        </button>
+                                        <small id="generated-yaml-copy-feedback" class="text-muted import-copy-feedback" aria-live="polite"></small>
+                                    </div>
+                                </div>
+                                <pre id="generated-yaml-preview" class="import-code-block"><code>@Model.Result.GeneratedYaml</code></pre>
                             }
                             else
                             {

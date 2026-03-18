@@ -234,7 +234,7 @@ public class DetailsModel : PageModel
                 DegradedCheckCount = flattenedNodes.Count(static node => node.Status == "Degraded"),
                 UnhealthyCheckCount = flattenedNodes.Count(static node => node.Status == "Unhealthy"),
                 UnknownCheckCount = flattenedNodes.Count(static node => node.Status is not ("Healthy" or "Degraded" or "Unhealthy")),
-                RawPayload = showRawPayload ? state?.Snapshot?.RawPayload : null,
+                RawPayload = showRawPayload ? FormatPayloadPreview(state?.Snapshot?.RawPayload) : null,
                 ShowRawPayload = showRawPayload
             };
         }
@@ -292,6 +292,29 @@ public class DetailsModel : PageModel
                 string text => text,
                 _ => JsonSerializer.Serialize(value)
             };
+        }
+
+        private static string? FormatPayloadPreview(string? rawPayload)
+        {
+            if (string.IsNullOrWhiteSpace(rawPayload))
+            {
+                return rawPayload;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(rawPayload);
+                return JsonSerializer.Serialize(
+                    document.RootElement,
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
+            }
+            catch (JsonException)
+            {
+                return rawPayload;
+            }
         }
 
         private static string ToBadgeClass(string status)
