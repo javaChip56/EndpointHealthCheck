@@ -63,6 +63,7 @@ public sealed class ImportModel : PageModel
 
             Input.Id = Result.SuggestedEndpoint.Id;
             Input.Name = Result.SuggestedEndpoint.Name;
+            ModelState.Clear();
 
             _logger.LogInformation(
                 "Import preview generated for suggested endpoint {EndpointId}.",

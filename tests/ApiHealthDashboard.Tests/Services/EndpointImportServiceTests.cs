@@ -3,6 +3,7 @@ using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Parsing;
 using ApiHealthDashboard.Services;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
 
 namespace ApiHealthDashboard.Tests.Services;
 
@@ -120,6 +121,35 @@ public sealed class EndpointImportServiceTests
         Assert.True(result.ResponsePreviewWasTruncated);
         Assert.Equal(12000, result.ResponsePreview.Length);
         Assert.Empty(result.DiffLines);
+    }
+
+    [Fact]
+    public async Task ImportAsync_WithHttpNotFound_DoesNotGenerateYamlPreview()
+    {
+        var service = new EndpointImportService(
+            new DashboardConfig(),
+            new StubEndpointPoller(new PollResult
+            {
+                Kind = PollResultKind.HttpError,
+                StatusCode = HttpStatusCode.NotFound,
+                ErrorMessage = "Endpoint returned HTTP 404 (NotFound)."
+            }),
+            new StubHealthResponseParser(new HealthSnapshot()),
+            NullLogger<EndpointImportService>.Instance);
+
+        var result = await service.ImportAsync(
+            new EndpointImportRequest
+            {
+                Url = "https://missing.example.com/health",
+                FrequencySeconds = 30
+            },
+            CancellationToken.None);
+
+        Assert.Equal(PollResultKind.HttpError, result.ProbeResult.Kind);
+        Assert.False(result.HasGeneratedYamlPreview);
+        Assert.Null(result.GeneratedYaml);
+        Assert.Empty(result.DiffLines);
+        Assert.False(string.IsNullOrWhiteSpace(result.ProbeStatusText));
     }
 
     private sealed class StubEndpointPoller : IEndpointPoller

@@ -7,7 +7,7 @@ public sealed class EndpointImportResult
 {
     public required EndpointConfig SuggestedEndpoint { get; init; }
 
-    public required string GeneratedYaml { get; init; }
+    public string? GeneratedYaml { get; init; }
 
     public required PollResult ProbeResult { get; init; }
 
@@ -37,7 +37,12 @@ public sealed class EndpointImportResult
 
     public bool HasDiff => DiffLines.Count > 0;
 
+    public bool HasGeneratedYamlPreview => !string.IsNullOrWhiteSpace(GeneratedYaml);
+
     public bool HasResponsePreview => !string.IsNullOrWhiteSpace(ResponsePreview);
+
+    public bool IsEndpointNotFound => ProbeResult.Kind == PollResultKind.HttpError &&
+                                      ProbeResult.StatusCode == HttpStatusCode.NotFound;
 
     public string ProbeHttpStatusText => ProbeResult.StatusCode is HttpStatusCode statusCode
         ? $"{(int)statusCode} {statusCode}"

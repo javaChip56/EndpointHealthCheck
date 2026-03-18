@@ -2,6 +2,14 @@
 @model ApiHealthDashboard.Pages.ImportModel
 @{
     ViewData["Title"] = "Import Endpoint";
+    var validationMessages = ViewData.ModelState.Values
+        .SelectMany(static entry => entry.Errors)
+        .Select(static error => string.IsNullOrWhiteSpace(error.ErrorMessage)
+            ? error.Exception?.Message
+            : error.ErrorMessage)
+        .Where(static message => !string.IsNullOrWhiteSpace(message))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
 }
 
 <div class="content-header">
@@ -60,7 +68,17 @@
                         <h3 class="card-title">Request And Import Settings</h3>
                     </div>
                     <div class="card-body">
-                        <div asp-validation-summary="All" class="alert alert-warning import-validation-summary" role="alert"></div>
+                        @if (validationMessages.Length > 0)
+                        {
+                            <div class="alert alert-warning import-validation-summary" role="alert">
+                                <ul class="mb-0 pl-3">
+                                    @foreach (var message in validationMessages)
+                                    {
+                                        <li>@message</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
 
                         <form method="post" asp-page-handler="Preview" class="import-form">
                             <div class="import-form-section">
@@ -181,6 +199,14 @@
 
                             <div class="alert @(Model.Result.ProbeResult.IsSuccess ? "alert-success" : "alert-warning") mt-3 mb-0">
                                 @Model.Result.ProbeStatusText
+                                @if (Model.Result.IsEndpointNotFound)
+                                {
+                                    <div class="mt-2">YAML preview is not generated when the endpoint returns HTTP 404 Not Found.</div>
+                                }
+                                else if (!Model.Result.ProbeResult.IsSuccess)
+                                {
+                                    <div class="mt-2">YAML preview is still available below based on the request settings you entered.</div>
+                                }
                                 @if (!string.IsNullOrWhiteSpace(Model.Result.ParserError))
                                 {
                                     <div class="mt-2"><strong>Parser note:</strong> @Model.Result.ParserError</div>
@@ -229,8 +255,15 @@
                             <h3 class="card-title">Generated YAML</h3>
                         </div>
                         <div class="card-body">
-                            <p class="text-muted">Copy this into <code>dashboard.yaml</code> or an endpoint YAML file after review.</p>
-                            <pre class="import-code-block"><code>@Model.Result.GeneratedYaml</code></pre>
+                            @if (Model.Result.HasGeneratedYamlPreview)
+                            {
+                                <p class="text-muted">Copy this into <code>dashboard.yaml</code> or an endpoint YAML file after review.</p>
+                                <pre class="import-code-block"><code>@Model.Result.GeneratedYaml</code></pre>
+                            }
+                            else
+                            {
+                                <div class="alert alert-light mb-0">No YAML preview was generated for this probe result.</div>
+                            }
                         </div>
                     </div>
                 </div>
@@ -241,7 +274,11 @@
                             <h3 class="card-title">Diff Preview</h3>
                         </div>
                         <div class="card-body">
-                            @if (Model.Result.HasExistingMatch && Model.Result.HasDiff)
+                            @if (!Model.Result.HasGeneratedYamlPreview)
+                            {
+                                <div class="alert alert-light mb-0">Diff preview is unavailable because no YAML preview was generated.</div>
+                            }
+                            else if (Model.Result.HasExistingMatch && Model.Result.HasDiff)
                             {
                                 <div class="import-diff-block" role="region" aria-label="YAML diff preview">
                                     @foreach (var line in Model.Result.DiffLines)

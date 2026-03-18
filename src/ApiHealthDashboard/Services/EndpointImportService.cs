@@ -86,10 +86,14 @@ public sealed class EndpointImportService : IEndpointImportService
             ExcludeChecks = []
         };
 
-        var generatedYaml = RenderEndpointYaml(suggestedEndpoint);
+        var shouldGenerateYamlPreview = !(pollResult.Kind == PollResultKind.HttpError &&
+                                          pollResult.StatusCode == System.Net.HttpStatusCode.NotFound);
+        var generatedYaml = shouldGenerateYamlPreview ? RenderEndpointYaml(suggestedEndpoint) : null;
         var existingEndpoint = FindExistingEndpoint(suggestedEndpoint);
         var existingYaml = existingEndpoint is null ? null : RenderEndpointYaml(existingEndpoint);
-        var diffLines = existingYaml is null ? [] : BuildDiff(existingYaml, generatedYaml);
+        var diffLines = existingYaml is null || string.IsNullOrWhiteSpace(generatedYaml)
+            ? []
+            : BuildDiff(existingYaml, generatedYaml);
         var responsePreview = BuildResponsePreview(pollResult.ResponseBody, out var responsePreviewWasTruncated);
         var discoveredChecks = snapshot is null ? [] : FlattenChecks(snapshot.Nodes);
         var parserError = TryGetParserError(snapshot);
