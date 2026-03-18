@@ -61,6 +61,8 @@ public sealed class EndpointConfig
 
     public int? TimeoutSeconds { get; set; }
 
+    public string Priority { get; set; } = EndpointPriority.Normal;
+
     public Dictionary<string, string> Headers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public List<string> IncludeChecks { get; set; } = new();
@@ -77,6 +79,7 @@ public sealed class EndpointConfig
             Enabled = Enabled,
             FrequencySeconds = FrequencySeconds,
             TimeoutSeconds = TimeoutSeconds,
+            Priority = Priority,
             Headers = new Dictionary<string, string>(Headers, StringComparer.OrdinalIgnoreCase),
             IncludeChecks = [.. IncludeChecks],
             ExcludeChecks = [.. ExcludeChecks]

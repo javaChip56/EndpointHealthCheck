@@ -2,6 +2,7 @@ id: billing-api
 name: Billing API
 url: https://billing.example.com/health
 enabled: true
+priority: Normal
 frequencySeconds: 60
 timeoutSeconds: 15
 headers: {}

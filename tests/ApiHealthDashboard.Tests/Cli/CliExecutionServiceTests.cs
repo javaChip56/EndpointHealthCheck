@@ -68,6 +68,7 @@ public sealed class CliExecutionServiceTests
                     Id = "orders-api",
                     Name = "Orders API",
                     Url = "https://orders.example.com/health",
+                    Priority = EndpointPriority.Critical,
                     Enabled = true,
                     FrequencySeconds = 30
                 },
@@ -76,6 +77,7 @@ public sealed class CliExecutionServiceTests
                     Id = "billing-api",
                     Name = "Billing API",
                     Url = "https://billing.example.com/health",
+                    Priority = EndpointPriority.Low,
                     Enabled = true,
                     FrequencySeconds = 60
                 }
@@ -106,6 +108,7 @@ public sealed class CliExecutionServiceTests
 
         var successEndpoint = Assert.Single(report.Endpoints.Where(static endpoint => endpoint.Id == "orders-api"));
         Assert.Equal("Executed", successEndpoint.ExecutionState);
+        Assert.Equal(EndpointPriority.Critical, successEndpoint.Priority);
         Assert.Equal("Healthy", successEndpoint.Status);
         Assert.NotNull(successEndpoint.Snapshot);
         Assert.Single(successEndpoint.Snapshot!.Nodes);
@@ -135,6 +138,7 @@ public sealed class CliExecutionServiceTests
                     Id = "disabled-api",
                     Name = "Disabled API",
                     Url = "https://disabled.example.com/health",
+                    Priority = EndpointPriority.High,
                     Enabled = false,
                     FrequencySeconds = 30
                 }
@@ -155,6 +159,7 @@ public sealed class CliExecutionServiceTests
 
         var endpoint = Assert.Single(report.Endpoints);
         Assert.Equal("selected-endpoints", report.Mode);
+        Assert.Equal(EndpointPriority.High, endpoint.Priority);
         Assert.Equal("Skipped", endpoint.ExecutionState);
         Assert.Equal("Skipped", endpoint.PollResultKind);
         Assert.Equal("Endpoint is disabled.", endpoint.ErrorMessage);

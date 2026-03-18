@@ -118,6 +118,10 @@ public class DetailsModel : PageModel
 
         public required string EnabledText { get; init; }
 
+        public required string Priority { get; init; }
+
+        public required string PriorityBadgeClass { get; init; }
+
         public required string FrequencyText { get; init; }
 
         public required string TimeoutText { get; init; }
@@ -194,6 +198,8 @@ public class DetailsModel : PageModel
                 Url = endpoint.Url,
                 Enabled = endpoint.Enabled,
                 EnabledText = endpoint.Enabled ? "Enabled" : "Disabled",
+                Priority = EndpointPriority.Normalize(endpoint.Priority),
+                PriorityBadgeClass = ToPriorityBadgeClass(endpoint.Priority),
                 FrequencyText = $"{endpoint.FrequencySeconds} seconds",
                 TimeoutText = endpoint.TimeoutSeconds is null ? "Default timeout" : $"{timeoutSeconds} seconds",
                 Status = status,
@@ -320,6 +326,17 @@ public class DetailsModel : PageModel
                 "Degraded" => "badge-warning",
                 "Unhealthy" => "badge-danger",
                 _ => "badge-secondary"
+            };
+        }
+
+        private static string ToPriorityBadgeClass(string priority)
+        {
+            return EndpointPriority.Normalize(priority) switch
+            {
+                EndpointPriority.Critical => "badge-danger",
+                EndpointPriority.High => "badge-warning",
+                EndpointPriority.Low => "badge-secondary",
+                _ => "badge-info"
             };
         }
     }

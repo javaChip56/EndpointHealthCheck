@@ -112,7 +112,8 @@ public class IndexModel : PageModel
                 statesById.TryGetValue(endpoint.Id, out var state);
                 return EndpointSummaryViewModel.From(endpoint, state);
             })
-            .OrderBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(static endpoint => endpoint.PrioritySortOrder)
+            .ThenBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         Counters = new DashboardCountersViewModel
@@ -130,7 +131,8 @@ public class IndexModel : PageModel
         ProblemEndpoints = Endpoints
             .Where(static endpoint => !string.IsNullOrWhiteSpace(endpoint.ErrorText) ||
                                       endpoint.Status is "Degraded" or "Unhealthy")
-            .OrderBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(static endpoint => endpoint.PrioritySortOrder)
+            .ThenBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         _logger.LogDebug("Loaded dashboard with {EndpointCount} endpoint summaries.", Endpoints.Count);
@@ -169,6 +171,12 @@ public class IndexModel : PageModel
 
         public required bool Enabled { get; init; }
 
+        public required string Priority { get; init; }
+
+        public required string PriorityBadgeClass { get; init; }
+
+        public int PrioritySortOrder { get; init; }
+
         public bool IsPolling { get; init; }
 
         public bool ShowIdHint { get; init; }
@@ -203,6 +211,9 @@ public class IndexModel : PageModel
                 StatusBadgeClass = ToBadgeClass(status),
                 FrequencyText = $"{endpoint.FrequencySeconds} sec",
                 Enabled = endpoint.Enabled,
+                Priority = EndpointPriority.Normalize(endpoint.Priority),
+                PriorityBadgeClass = ToPriorityBadgeClass(endpoint.Priority),
+                PrioritySortOrder = EndpointPriority.GetSortOrder(endpoint.Priority),
                 IsPolling = state?.IsPolling ?? false,
                 ShowIdHint = ShouldShowIdHint(endpoint.Name, endpoint.Id),
                 LastCheckedText = FormatDateTime(state?.LastCheckedUtc),
@@ -256,6 +267,17 @@ public class IndexModel : PageModel
                 "Degraded" => "badge-warning",
                 "Unhealthy" => "badge-danger",
                 _ => "badge-secondary"
+            };
+        }
+
+        private static string ToPriorityBadgeClass(string priority)
+        {
+            return EndpointPriority.Normalize(priority) switch
+            {
+                EndpointPriority.Critical => "badge-danger",
+                EndpointPriority.High => "badge-warning",
+                EndpointPriority.Low => "badge-secondary",
+                _ => "badge-info"
             };
         }
     }

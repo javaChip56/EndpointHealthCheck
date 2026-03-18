@@ -81,6 +81,7 @@ public sealed class DetailsModelTests
     public void OnGet_WithSnapshot_LoadsDetailedDiagnostics()
     {
         var config = CreateConfig(showRawPayload: true);
+        config.Endpoints[0].Priority = EndpointPriority.Critical;
         config.Endpoints[0].Headers["X-Api-Key"] = "super-secret";
         config.Endpoints[0].IncludeChecks.Add("database");
         config.Endpoints[0].ExcludeChecks.Add("cache");
@@ -145,6 +146,7 @@ public sealed class DetailsModelTests
         Assert.Equal(1, model.Endpoint.HealthyCheckCount);
         Assert.Equal(1, model.Endpoint.DegradedCheckCount);
         Assert.Equal(1, model.Endpoint.UnhealthyCheckCount);
+        Assert.Equal(EndpointPriority.Critical, model.Endpoint.Priority);
         Assert.Equal("********", model.Endpoint.Headers.Single().ValuePreview);
         Assert.Equal(["database"], model.Endpoint.IncludeChecks);
         Assert.Equal(["cache"], model.Endpoint.ExcludeChecks);
@@ -211,6 +213,7 @@ public sealed class DetailsModelTests
                     Id = "orders-api",
                     Name = "Orders API",
                     Url = "https://orders.example.com/health",
+                    Priority = EndpointPriority.Normal,
                     Enabled = true,
                     FrequencySeconds = 30
                 }

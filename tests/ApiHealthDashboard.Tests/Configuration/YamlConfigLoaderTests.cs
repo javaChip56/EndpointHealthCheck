@@ -28,6 +28,7 @@ public sealed class YamlConfigLoaderTests : IDisposable
                 name: Orders API
                 url: https://orders.example.com/health
                 enabled: true
+                priority: critical
                 frequencySeconds: 30
                 timeoutSeconds: 5
                 headers:
@@ -51,6 +52,7 @@ public sealed class YamlConfigLoaderTests : IDisposable
         Assert.Equal("orders-api", endpoint.Id);
         Assert.Equal("Orders API", endpoint.Name);
         Assert.Equal("https://orders.example.com/health", endpoint.Url);
+        Assert.Equal(EndpointPriority.Critical, endpoint.Priority);
         Assert.Equal(30, endpoint.FrequencySeconds);
         Assert.Equal(5, endpoint.TimeoutSeconds);
         Assert.Equal("enabled", endpoint.Headers["X-Trace"]);
@@ -203,6 +205,7 @@ public sealed class YamlConfigLoaderTests : IDisposable
             id: orders-api
             name: Orders API
             url: https://orders.example.com/health
+            priority: high
             frequencySeconds: 30
             """);
 

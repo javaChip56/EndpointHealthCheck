@@ -279,6 +279,7 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
             endpoint.Id = endpoint.Id?.Trim() ?? string.Empty;
             endpoint.Name = endpoint.Name?.Trim() ?? string.Empty;
             endpoint.Url = endpoint.Url?.Trim() ?? string.Empty;
+            endpoint.Priority = EndpointPriority.Normalize(endpoint.Priority);
             endpoint.Headers = endpoint.Headers is null
                 ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, string>(endpoint.Headers, StringComparer.OrdinalIgnoreCase);

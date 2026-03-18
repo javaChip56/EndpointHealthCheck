@@ -85,6 +85,7 @@ Current configuration support:
 - `dashboard.showRawPayload`
 - `dashboard.endpointFiles` for loading endpoints from one or more separate YAML files
 - endpoint `id`, `name`, `url`, `enabled`, `frequencySeconds`, `timeoutSeconds`
+- endpoint `priority` with `Critical`, `High`, `Normal`, or `Low`
 - endpoint `headers`, `includeChecks`, `excludeChecks`
 - `${ENV_VAR}` substitution in YAML values
 - endpoint definitions can be kept inline in `dashboard.yaml` or split into multiple files under [`src/ApiHealthDashboard/endpoints`](src/ApiHealthDashboard/endpoints)
@@ -202,6 +203,7 @@ Current dashboard behavior:
 - highlights healthy, degraded, unhealthy, and unknown totals in summary cards
 - includes a client-side search field for filtering endpoint rows by name, id, status, or error text
 - refreshes the live dashboard section with same-origin timed GET requests instead of reloading the whole page
+- sorts endpoint summaries and active issues by endpoint priority before name
 - renders a live endpoint table with last check, duration, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
 - shows a clearer empty state when no endpoints are configured
@@ -214,6 +216,7 @@ Current import behavior:
 - sends a live request using the entered URL, headers, timeout, and enabled/frequency settings
 - auto-suggests endpoint id and name when those fields are left blank
 - shows a soft warning when the chosen poll frequency is below the configured appsettings recommendation
+- emits generated YAML with a normalized endpoint priority value
 - parses discovered checks from the response and can optionally populate `includeChecks`
 - generates a normalized YAML snippet for manual copy into `dashboard.yaml` or a separate endpoint file
 - compares the generated YAML against the currently loaded config when an existing endpoint matches by id or URL
@@ -228,6 +231,7 @@ Current CLI behavior:
 - executes one or more specific endpoint YAML files with repeated `--endpoint-file` arguments
 - reuses dashboard settings from `dashboard.yaml`, including default request timeout values
 - writes a machine-readable JSON report to standard output
+- includes endpoint priority in JSON and XML execution reports
 - can optionally write the same execution report to a JSON or XML file
 - keeps missing dashboard or endpoint YAML files as warnings in the output instead of failing hard
 
@@ -236,7 +240,7 @@ Current CLI behavior:
 The endpoint details page now acts as a diagnostic view for a single configured endpoint.
 
 Current details-page behavior:
-- shows endpoint metadata including enabled state, frequency, timeout, and masked request headers
+- shows endpoint metadata including enabled state, priority, frequency, timeout, and masked request headers
 - shows request filter configuration for included and excluded checks
 - summarizes the latest poll with status, timings, retrieved timestamp, and current error
 - renders top-level and nested health checks recursively with native expand and collapse support
@@ -478,7 +482,6 @@ Test file:
 ## Future Plans
 
 These are planned enhancements after the current v1 path:
-- allow per-endpoint priority so important endpoints can be surfaced and scheduled differently
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API
 
 ## Notes For Ongoing Updates

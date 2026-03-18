@@ -58,6 +58,12 @@ public sealed class DashboardConfigValidator
                 errors.Add($"{prefix}.timeoutSeconds must be greater than zero when specified.");
             }
 
+            if (!EndpointPriority.IsValid(endpoint.Priority))
+            {
+                errors.Add(
+                    $"{prefix}.priority must be one of: {string.Join(", ", EndpointPriority.AllowedValues)}.");
+            }
+
             foreach (var header in endpoint.Headers)
             {
                 if (string.IsNullOrWhiteSpace(header.Key))

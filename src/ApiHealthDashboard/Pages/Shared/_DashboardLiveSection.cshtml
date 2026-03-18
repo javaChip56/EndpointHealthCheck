@@ -93,7 +93,7 @@
                             </div>
                             <input type="search"
                                    class="form-control"
-                                   placeholder="Search name, id, status, or error"
+                                   placeholder="Search name, id, priority, status, or error"
                                    aria-label="Search endpoints"
                                    data-endpoint-search-input />
                         </div>
@@ -126,6 +126,7 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Status</th>
+                                <th>Priority</th>
                                 <th>Last Checked</th>
                                 <th>Last Successful</th>
                                 <th>Duration</th>
@@ -144,6 +145,7 @@
                                         endpoint.Name,
                                         endpoint.Id,
                                         endpoint.Status,
+                                        endpoint.Priority,
                                         endpoint.StatusDescription,
                                         endpoint.ErrorSummary
                                     }.Where(static value => !string.IsNullOrWhiteSpace(value)));
@@ -166,6 +168,9 @@
                                         {
                                             <div><small class="text-muted">@endpoint.StatusDescription</small></div>
                                         }
+                                    </td>
+                                    <td>
+                                        <span class="badge @endpoint.PriorityBadgeClass">@endpoint.Priority</span>
                                     </td>
                                     <td>@endpoint.LastCheckedText</td>
                                     <td>@endpoint.LastSuccessfulText</td>
@@ -193,7 +198,7 @@
                                 </tr>
                             }
                             <tr data-endpoint-search-empty hidden>
-                                <td colspan="8" class="text-center text-muted py-4">
+                                <td colspan="9" class="text-center text-muted py-4">
                                     No endpoints match your search.
                                 </td>
                             </tr>
@@ -259,6 +264,7 @@
                                 <span class="text">
                                     <strong>@endpoint.Name</strong>
                                     <span class="badge @endpoint.StatusBadgeClass ml-2">@endpoint.Status</span>
+                                    <span class="badge @endpoint.PriorityBadgeClass ml-2">@endpoint.Priority</span>
                                 </span>
                                 <div class="text-muted small mt-1">Last checked: @endpoint.LastCheckedText</div>
                                 @if (!string.IsNullOrWhiteSpace(endpoint.ErrorText))

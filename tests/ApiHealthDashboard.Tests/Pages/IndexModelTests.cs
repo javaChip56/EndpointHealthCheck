@@ -85,6 +85,8 @@ public sealed class IndexModelTests
     public void OnGet_CalculatesMixedStatusCountersAndProblemEndpoints()
     {
         var config = CreateConfig();
+        config.Endpoints[0].Priority = EndpointPriority.High;
+        config.Endpoints[1].Priority = EndpointPriority.Critical;
         var store = new InMemoryEndpointStateStore(config.Endpoints);
 
         store.Upsert(new ApiHealthDashboard.Domain.EndpointState
@@ -115,6 +117,22 @@ public sealed class IndexModelTests
         Assert.Equal(0, model.Counters.Unknown);
         Assert.Single(model.ProblemEndpoints);
         Assert.Equal("billing-api", model.ProblemEndpoints[0].Id);
+        Assert.Equal(EndpointPriority.Critical, model.ProblemEndpoints[0].Priority);
+    }
+
+    [Fact]
+    public void OnGet_SortsEndpointsByPriorityBeforeName()
+    {
+        var config = CreateConfig();
+        config.Endpoints[0].Priority = EndpointPriority.Low;
+        config.Endpoints[1].Priority = EndpointPriority.Critical;
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        Assert.Equal("billing-api", model.Endpoints[0].Id);
+        Assert.Equal(EndpointPriority.Critical, model.Endpoints[0].Priority);
     }
 
     [Fact]
@@ -190,6 +208,7 @@ public sealed class IndexModelTests
                     Id = "orders-api",
                     Name = "Orders API",
                     Url = "https://orders.example.com/health",
+                    Priority = EndpointPriority.Normal,
                     Enabled = true,
                     FrequencySeconds = 30
                 },
@@ -198,6 +217,7 @@ public sealed class IndexModelTests
                     Id = "billing-api",
                     Name = "Billing API",
                     Url = "https://billing.example.com/health",
+                    Priority = EndpointPriority.Normal,
                     Enabled = true,
                     FrequencySeconds = 60
                 }

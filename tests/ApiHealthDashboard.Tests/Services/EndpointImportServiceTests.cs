@@ -21,6 +21,7 @@ public sealed class EndpointImportServiceTests
                     Id = "orders-api",
                     Name = "Orders API",
                     Url = "https://orders.example.com/health",
+                    Priority = EndpointPriority.High,
                     Enabled = true,
                     FrequencySeconds = 60
                 }
@@ -65,7 +66,9 @@ public sealed class EndpointImportServiceTests
 
         Assert.Equal("orders-api", result.SuggestedEndpoint.Id);
         Assert.Equal("Orders API", result.SuggestedEndpoint.Name);
+        Assert.Equal(EndpointPriority.High, result.SuggestedEndpoint.Priority);
         Assert.True(result.HasExistingMatch);
+        Assert.Contains("priority: 'High'", result.GeneratedYaml, StringComparison.Ordinal);
         Assert.Contains("includeChecks:", result.GeneratedYaml, StringComparison.Ordinal);
         Assert.Contains("'database'", result.GeneratedYaml, StringComparison.Ordinal);
         Assert.Equal(["cache", "database"], result.TopLevelCheckNames);
@@ -118,6 +121,7 @@ public sealed class EndpointImportServiceTests
             CancellationToken.None);
 
         Assert.False(result.HasExistingMatch);
+        Assert.Equal(EndpointPriority.Normal, result.SuggestedEndpoint.Priority);
         Assert.True(result.ResponsePreviewWasTruncated);
         Assert.Equal(12000, result.ResponsePreview.Length);
         Assert.Empty(result.DiffLines);

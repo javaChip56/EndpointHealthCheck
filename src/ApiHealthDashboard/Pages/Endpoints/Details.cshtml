@@ -61,6 +61,7 @@ else
                                     <span class="hero-stat-label">Overall status</span>
                                     <div class="d-flex align-items-center flex-wrap">
                                         <span class="badge @endpoint.StatusBadgeClass mr-2">@endpoint.Status</span>
+                                        <span class="badge @endpoint.PriorityBadgeClass mr-2">@endpoint.Priority</span>
                                         @if (endpoint.IsPolling)
                                         {
                                             <small class="text-white-50">Polling now</small>
@@ -158,6 +159,10 @@ else
                                 <div class="metric-item">
                                     <span class="metric-label">Polling Frequency</span>
                                     <div class="metric-value">@endpoint.FrequencyText</div>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Priority</span>
+                                    <div class="metric-value"><span class="badge @endpoint.PriorityBadgeClass">@endpoint.Priority</span></div>
                                 </div>
                                 <div class="metric-item">
                                     <span class="metric-label">Timeout</span>

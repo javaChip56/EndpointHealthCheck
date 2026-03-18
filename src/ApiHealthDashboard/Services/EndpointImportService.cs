@@ -67,6 +67,7 @@ public sealed class EndpointImportService : IEndpointImportService
         var snapshot = string.IsNullOrWhiteSpace(pollResult.ResponseBody)
             ? null
             : _healthResponseParser.Parse(probeEndpoint, pollResult.ResponseBody, pollResult.DurationMs);
+        var existingEndpoint = FindExistingEndpoint(probeEndpoint);
         var topLevelCheckNames = snapshot?.Nodes
             .Select(static node => node.Name)
             .Where(static name => !string.IsNullOrWhiteSpace(name))
@@ -82,6 +83,7 @@ public sealed class EndpointImportService : IEndpointImportService
             Enabled = probeEndpoint.Enabled,
             FrequencySeconds = probeEndpoint.FrequencySeconds,
             TimeoutSeconds = probeEndpoint.TimeoutSeconds,
+            Priority = EndpointPriority.Normalize(existingEndpoint?.Priority),
             Headers = new Dictionary<string, string>(probeEndpoint.Headers, StringComparer.OrdinalIgnoreCase),
             IncludeChecks = request.IncludeDiscoveredChecks ? [.. topLevelCheckNames] : [],
             ExcludeChecks = []
@@ -90,7 +92,6 @@ public sealed class EndpointImportService : IEndpointImportService
         var shouldGenerateYamlPreview = !(pollResult.Kind == PollResultKind.HttpError &&
                                           pollResult.StatusCode == System.Net.HttpStatusCode.NotFound);
         var generatedYaml = shouldGenerateYamlPreview ? RenderEndpointYaml(suggestedEndpoint) : null;
-        var existingEndpoint = FindExistingEndpoint(suggestedEndpoint);
         var existingYaml = existingEndpoint is null ? null : RenderEndpointYaml(existingEndpoint);
         var diffLines = existingYaml is null || string.IsNullOrWhiteSpace(generatedYaml)
             ? []
@@ -399,6 +400,7 @@ public sealed class EndpointImportService : IEndpointImportService
             $"name: {Quote(endpoint.Name)}",
             $"url: {Quote(endpoint.Url)}",
             $"enabled: {endpoint.Enabled.ToString().ToLowerInvariant()}",
+            $"priority: {Quote(EndpointPriority.Normalize(endpoint.Priority))}",
             $"frequencySeconds: {endpoint.FrequencySeconds}"
         };
 

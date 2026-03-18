@@ -88,4 +88,27 @@ public sealed class DashboardConfigValidatorTests
 
         Assert.Contains("endpoints[0].url must be an absolute HTTP or HTTPS URL.", errors);
     }
+
+    [Fact]
+    public void Validate_WithInvalidPriority_ReturnsPriorityError()
+    {
+        var config = new DashboardConfig
+        {
+            Endpoints =
+            [
+                new EndpointConfig
+                {
+                    Id = "orders-api",
+                    Name = "Orders API",
+                    Url = "https://orders.example.com/health",
+                    Priority = "Urgent",
+                    FrequencySeconds = 30
+                }
+            ]
+        };
+
+        var errors = _validator.Validate(config);
+
+        Assert.Contains("endpoints[0].priority must be one of: Critical, High, Normal, Low.", errors);
+    }
 }
