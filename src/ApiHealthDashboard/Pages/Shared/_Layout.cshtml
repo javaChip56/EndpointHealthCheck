@@ -2,6 +2,7 @@
     var currentPage = ViewContext.RouteData.Values["page"] as string ?? string.Empty;
     var isDashboardPage = currentPage == "/Index";
     var isEndpointPage = currentPage.StartsWith("/Endpoints");
+    var isImportPage = currentPage == "/Import";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -69,6 +70,12 @@
                             <a asp-page="/Endpoints/Details" asp-route-id="orders-api" class="nav-link @(isEndpointPage ? "active" : string.Empty)">
                                 <i class="nav-icon fas fa-stethoscope"></i>
                                 <p>Endpoint Details</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a asp-page="/Import" class="nav-link @(isImportPage ? "active" : string.Empty)">
+                                <i class="nav-icon fas fa-file-import"></i>
+                                <p>Import Endpoint</p>
                             </a>
                         </li>
                     </ul>

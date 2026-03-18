@@ -63,6 +63,7 @@ builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient(nameof(EndpointPoller));
 builder.Services.AddSingleton<IEndpointPoller, EndpointPoller>();
+builder.Services.AddSingleton<IEndpointImportService, EndpointImportService>();
 builder.Services.AddSingleton<IHealthResponseParser, HealthResponseParser>();
 builder.Services.AddSingleton<PollingSchedulerService>();
 builder.Services.AddSingleton<IEndpointScheduler>(static serviceProvider =>

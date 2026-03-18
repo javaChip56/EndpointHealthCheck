@@ -27,6 +27,7 @@ Implemented so far:
 - Phase 12: automated test expansion for invalid and edge-case coverage
 - Phase 13: publish and deployment validation
 - Phase 14: GitHub Actions CI/CD and Dependabot automation
+- Post-v1: endpoint import flow with live probe, YAML preview, and diff comparison
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -70,6 +71,7 @@ The app uses locally bundled AdminLTE assets under [`src/ApiHealthDashboard/wwwr
 Current UI pages:
 - dashboard summary page: [`src/ApiHealthDashboard/Pages/Index.cshtml`](src/ApiHealthDashboard/Pages/Index.cshtml)
 - endpoint details page: [`src/ApiHealthDashboard/Pages/Endpoints/Details.cshtml`](src/ApiHealthDashboard/Pages/Endpoints/Details.cshtml)
+- endpoint import preview page: [`src/ApiHealthDashboard/Pages/Import.cshtml`](src/ApiHealthDashboard/Pages/Import.cshtml)
 
 ### YAML Configuration
 
@@ -186,6 +188,18 @@ Current dashboard behavior:
 - renders a live endpoint table with last check, duration, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
 - shows a clearer empty state when no endpoints are configured
+
+### Endpoint Import Flow
+
+The app now includes an endpoint import preview flow for deriving YAML from a live API probe without writing files automatically.
+
+Current import behavior:
+- sends a live request using the entered URL, headers, timeout, and enabled/frequency settings
+- auto-suggests endpoint id and name when those fields are left blank
+- parses discovered checks from the response and can optionally populate `includeChecks`
+- generates a normalized YAML snippet for manual copy into `dashboard.yaml` or a separate endpoint file
+- compares the generated YAML against the currently loaded config when an existing endpoint matches by id or URL
+- shows a diff preview plus a raw response preview for review before any manual save
 
 ### Endpoint Details
 
@@ -401,7 +415,6 @@ Test file:
 ## Future Plans
 
 These are planned enhancements after the current v1 path:
-- add an import flow that can derive YAML endpoint config from API request and response inspection, with preview and diff comparison before any manual save
 - add CLI execution with machine-readable output for automation and scripting scenarios
 - allow per-endpoint priority so important endpoints can be surfaced and scheduled differently
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API
