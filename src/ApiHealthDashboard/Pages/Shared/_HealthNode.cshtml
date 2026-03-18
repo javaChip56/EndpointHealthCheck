@@ -1,0 +1,52 @@
+@model ApiHealthDashboard.Domain.HealthNode
+@{
+    var badgeClass = Model.Status switch
+    {
+        "Healthy" => "badge-success",
+        "Degraded" => "badge-warning",
+        "Unhealthy" => "badge-danger",
+        _ => "badge-secondary"
+    };
+}
+
+<div class="timeline-item">
+    <h3 class="timeline-header">
+        @Model.Name
+        <span class="badge @badgeClass">@Model.Status</span>
+    </h3>
+    <div class="timeline-body">
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <div><strong>Description:</strong> @Model.Description</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.DurationText))
+        {
+            <div><strong>Duration:</strong> @Model.DurationText</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="text-danger"><strong>Error:</strong> @Model.ErrorMessage</div>
+        }
+        @if (Model.Data.Count > 0)
+        {
+            <div class="mt-2">
+                <strong>Data</strong>
+                <ul class="mb-0 mt-1 pl-3">
+                    @foreach (var item in Model.Data.OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase))
+                    {
+                        <li><code>@item.Key</code>: @item.Value</li>
+                    }
+                </ul>
+            </div>
+        }
+        @if (Model.Children.Count > 0)
+        {
+            <div class="mt-3 nested-health-group">
+                @foreach (var child in Model.Children)
+                {
+                    <partial name="_HealthNode" model="child" />
+                }
+            </div>
+        }
+    </div>
+</div>

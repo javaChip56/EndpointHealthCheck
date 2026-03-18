@@ -21,30 +21,42 @@
 
 <section class="content">
     <div class="container-fluid">
+        @if (TempData["StatusMessage"] is string statusMessage)
+        {
+            var statusType = TempData["StatusType"] as string ?? "info";
+
+            <div class="alert alert-@statusType alert-dismissible">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                @statusMessage
+            </div>
+        }
+
         <div class="dashboard-hero card card-outline card-primary">
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-lg-8">
-                        <span class="hero-kicker">Phase 2 Placeholder</span>
-                        <h2 class="hero-title">Local AdminLTE shell for endpoint monitoring</h2>
+                        <span class="hero-kicker">Phase 8 Manual Refresh</span>
+                        <h2 class="hero-title">Live endpoint inventory backed by scheduler state</h2>
                         <p class="hero-copy mb-0">
-                            This page is the starting canvas for the live health overview. In later phases it will bind to YAML-driven
-                            endpoints, runtime polling state, and manual refresh actions.
+                            The dashboard now reads configured endpoints and current runtime state from the in-memory store.
+                            Manual refresh actions reuse the scheduler so they do not interfere with in-progress polling.
                         </p>
                     </div>
                     <div class="col-lg-4">
                         <div class="hero-panel">
                             <div class="hero-stat">
-                                <span class="hero-stat-label">Frontend assets</span>
-                                <strong>Bundled locally</strong>
+                                <span class="hero-stat-label">Configured endpoints</span>
+                                <strong>@Model.Counters.Total</strong>
                             </div>
                             <div class="hero-stat">
-                                <span class="hero-stat-label">UI style</span>
-                                <strong>AdminLTE + Razor Pages</strong>
+                                <span class="hero-stat-label">Scheduler mode</span>
+                                <strong>Background loops active</strong>
                             </div>
                             <div class="hero-stat mb-0">
-                                <span class="hero-stat-label">Monitoring mode</span>
-                                <strong>Placeholder state</strong>
+                                <span class="hero-stat-label">Refresh path</span>
+                                <strong>Manual + scheduled</strong>
                             </div>
                         </div>
                     </div>
@@ -54,9 +66,20 @@
 
         <div class="row">
             <div class="col-lg-3 col-6">
+                <div class="small-box health-box bg-primary">
+                    <div class="inner">
+                        <h3>@Model.Counters.Total</h3>
+                        <p>Total Endpoints</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-6">
                 <div class="small-box health-box bg-success">
                     <div class="inner">
-                        <h3>18</h3>
+                        <h3>@Model.Counters.Healthy</h3>
                         <p>Healthy Endpoints</p>
                     </div>
                     <div class="icon">
@@ -67,7 +90,7 @@
             <div class="col-lg-3 col-6">
                 <div class="small-box health-box bg-warning">
                     <div class="inner">
-                        <h3>3</h3>
+                        <h3>@Model.Counters.Degraded</h3>
                         <p>Degraded Endpoints</p>
                     </div>
                     <div class="icon">
@@ -78,22 +101,11 @@
             <div class="col-lg-3 col-6">
                 <div class="small-box health-box bg-danger">
                     <div class="inner">
-                        <h3>1</h3>
-                        <p>Unhealthy Endpoints</p>
+                        <h3>@(Model.Counters.Unhealthy + Model.Counters.Unknown)</h3>
+                        <p>Unhealthy or Unknown</p>
                     </div>
                     <div class="icon">
                         <i class="fas fa-radiation"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-6">
-                <div class="small-box health-box bg-secondary">
-                    <div class="inner">
-                        <h3>2</h3>
-                        <p>Unknown or Unreachable</p>
-                    </div>
-                    <div class="icon">
-                        <i class="fas fa-question-circle"></i>
                     </div>
                 </div>
             </div>
@@ -105,62 +117,73 @@
                     <div class="card-header border-0">
                         <h3 class="card-title">Monitored Endpoints</h3>
                         <div class="card-tools">
-                            <a href="#" class="btn btn-tool disabled" aria-disabled="true">Refresh All</a>
+                            <form method="post" asp-page-handler="RefreshAll" class="d-inline">
+                                <button type="submit" class="btn btn-tool">
+                                    <i class="fas fa-sync-alt mr-1"></i>Refresh All
+                                </button>
+                            </form>
                         </div>
                     </div>
                     <div class="card-body table-responsive p-0">
-                        <table class="table table-hover text-nowrap">
+                        <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Name</th>
                                     <th>Status</th>
                                     <th>Last Checked</th>
+                                    <th>Last Successful</th>
                                     <th>Duration</th>
                                     <th>Frequency</th>
-                                    <th></th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td>Orders API</td>
-                                    <td><span class="badge badge-success">Healthy</span></td>
-                                    <td>09:15 UTC</td>
-                                    <td>184 ms</td>
-                                    <td>30 sec</td>
-                                    <td class="text-right">
-                                        <a asp-page="/Endpoints/Details" asp-route-id="orders-api" class="btn btn-sm btn-outline-primary">Details</a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Billing API</td>
-                                    <td><span class="badge badge-warning">Degraded</span></td>
-                                    <td>09:14 UTC</td>
-                                    <td>612 ms</td>
-                                    <td>60 sec</td>
-                                    <td class="text-right">
-                                        <a asp-page="/Endpoints/Details" asp-route-id="billing-api" class="btn btn-sm btn-outline-primary">Details</a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Identity API</td>
-                                    <td><span class="badge badge-danger">Unhealthy</span></td>
-                                    <td>09:14 UTC</td>
-                                    <td>1,408 ms</td>
-                                    <td>45 sec</td>
-                                    <td class="text-right">
-                                        <a asp-page="/Endpoints/Details" asp-route-id="identity-api" class="btn btn-sm btn-outline-primary">Details</a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Notifications API</td>
-                                    <td><span class="badge badge-secondary">Unknown</span></td>
-                                    <td>Never</td>
-                                    <td>-</td>
-                                    <td>120 sec</td>
-                                    <td class="text-right">
-                                        <a asp-page="/Endpoints/Details" asp-route-id="notifications-api" class="btn btn-sm btn-outline-primary">Details</a>
-                                    </td>
-                                </tr>
+                                @if (Model.Endpoints.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-4">No endpoints are configured.</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var endpoint in Model.Endpoints)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="font-weight-semibold">@endpoint.Name</div>
+                                                <small class="text-muted">@endpoint.Id</small>
+                                                @if (!endpoint.Enabled)
+                                                {
+                                                    <div><small class="text-muted">Disabled</small></div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(endpoint.ErrorText))
+                                                {
+                                                    <div><small class="text-danger">@endpoint.ErrorText</small></div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <span class="badge @endpoint.StatusBadgeClass">@endpoint.Status</span>
+                                                @if (endpoint.IsPolling)
+                                                {
+                                                    <div><small class="text-info">Polling now</small></div>
+                                                }
+                                            </td>
+                                            <td>@endpoint.LastCheckedText</td>
+                                            <td>@endpoint.LastSuccessfulText</td>
+                                            <td>@endpoint.DurationText</td>
+                                            <td>@endpoint.FrequencyText</td>
+                                            <td class="text-nowrap">
+                                                <form method="post" asp-page-handler="RefreshEndpoint" class="d-inline">
+                                                    <input type="hidden" name="endpointId" value="@endpoint.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-sync-alt"></i>
+                                                    </button>
+                                                </form>
+                                                <a asp-page="/Endpoints/Details" asp-route-id="@endpoint.Id" class="btn btn-sm btn-outline-secondary">Details</a>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
                             </tbody>
                         </table>
                     </div>
@@ -169,28 +192,35 @@
             <div class="col-lg-4">
                 <div class="card card-outline card-primary">
                     <div class="card-header">
-                        <h3 class="card-title">Build Progress</h3>
+                        <h3 class="card-title">Scheduler Snapshot</h3>
                     </div>
                     <div class="card-body">
                         <div class="progress-group">
-                            Layout and shell
-                            <span class="float-right"><b>Done</b></span>
+                            Healthy
+                            <span class="float-right"><b>@Model.Counters.Healthy</b> / @Model.Counters.Total</span>
                             <div class="progress progress-sm">
-                                <div class="progress-bar bg-primary" style="width: 100%"></div>
+                                <div class="progress-bar bg-success" style="width: @(Model.Counters.Total == 0 ? 0 : (Model.Counters.Healthy * 100 / Model.Counters.Total))%"></div>
                             </div>
                         </div>
                         <div class="progress-group">
-                            YAML configuration
-                            <span class="float-right"><b>Next</b></span>
+                            Degraded
+                            <span class="float-right"><b>@Model.Counters.Degraded</b> / @Model.Counters.Total</span>
                             <div class="progress progress-sm">
-                                <div class="progress-bar bg-info" style="width: 20%"></div>
+                                <div class="progress-bar bg-warning" style="width: @(Model.Counters.Total == 0 ? 0 : (Model.Counters.Degraded * 100 / Model.Counters.Total))%"></div>
                             </div>
                         </div>
                         <div class="progress-group">
-                            Polling and parser
-                            <span class="float-right"><b>Planned</b></span>
+                            Unhealthy
+                            <span class="float-right"><b>@Model.Counters.Unhealthy</b> / @Model.Counters.Total</span>
                             <div class="progress progress-sm">
-                                <div class="progress-bar bg-secondary" style="width: 0%"></div>
+                                <div class="progress-bar bg-danger" style="width: @(Model.Counters.Total == 0 ? 0 : (Model.Counters.Unhealthy * 100 / Model.Counters.Total))%"></div>
+                            </div>
+                        </div>
+                        <div class="progress-group">
+                            Unknown
+                            <span class="float-right"><b>@Model.Counters.Unknown</b> / @Model.Counters.Total</span>
+                            <div class="progress progress-sm">
+                                <div class="progress-bar bg-secondary" style="width: @(Model.Counters.Total == 0 ? 0 : (Model.Counters.Unknown * 100 / Model.Counters.Total))%"></div>
                             </div>
                         </div>
                     </div>
@@ -198,21 +228,21 @@
 
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Expected Summary Signals</h3>
+                        <h3 class="card-title">Current Signals</h3>
                     </div>
                     <div class="card-body p-0">
                         <ul class="todo-list endpoint-notes" data-widget="todo-list">
                             <li>
-                                <span class="text">Per-endpoint polling frequency and timeout</span>
+                                <span class="text">Manual refresh buttons reuse the scheduler interface.</span>
                             </li>
                             <li>
-                                <span class="text">Last checked and last successful timestamps</span>
+                                <span class="text">Overlap protection keeps one endpoint from being double-polled.</span>
                             </li>
                             <li>
-                                <span class="text">Current error state and response duration</span>
+                                <span class="text">Status, duration, and error state come from the runtime store.</span>
                             </li>
                             <li>
-                                <span class="text">Quick link into recursive endpoint details</span>
+                                <span class="text">Details page now reflects real endpoint metadata and current snapshot data.</span>
                             </li>
                         </ul>
                     </div>

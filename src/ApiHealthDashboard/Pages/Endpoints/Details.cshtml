@@ -2,6 +2,7 @@
 @model ApiHealthDashboard.Pages.Endpoints.DetailsModel
 @{
     ViewData["Title"] = "Endpoint Details";
+    var endpoint = Model.Endpoint;
 }
 
 <div class="content-header">
@@ -20,138 +21,165 @@
     </div>
 </div>
 
-<section class="content">
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-4">
-                <div class="card card-primary card-outline">
-                    <div class="card-header">
-                        <h3 class="card-title">Endpoint Summary</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="metric-list">
-                            <div class="metric-item">
-                                <span class="metric-label">Endpoint Id</span>
-                                <div class="metric-value">@Model.EndpointId</div>
-                            </div>
-                            <div class="metric-item">
-                                <span class="metric-label">URL</span>
-                                <div class="metric-value">https://api.internal.example/@Model.EndpointId/health</div>
-                            </div>
-                            <div class="metric-item">
-                                <span class="metric-label">Polling Frequency</span>
-                                <div class="metric-value">30 seconds</div>
-                            </div>
-                            <div class="metric-item">
-                                <span class="metric-label">Timeout</span>
-                                <div class="metric-value">10 seconds</div>
-                            </div>
-                            <div class="metric-item">
-                                <span class="metric-label">Current Status</span>
-                                <div class="metric-value"><span class="badge badge-warning">Degraded</span></div>
+@if (endpoint is null)
+{
+    <section class="content">
+        <div class="container-fluid">
+            <div class="alert alert-warning">The requested endpoint could not be found.</div>
+        </div>
+    </section>
+}
+else
+{
+    <section class="content">
+        <div class="container-fluid">
+            @if (TempData["StatusMessage"] is string statusMessage)
+            {
+                var statusType = TempData["StatusType"] as string ?? "info";
+
+                <div class="alert alert-@statusType alert-dismissible">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    @statusMessage
+                </div>
+            }
+
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="card card-primary card-outline">
+                        <div class="card-header">
+                            <h3 class="card-title">Endpoint Summary</h3>
+                            <div class="card-tools">
+                                <form method="post" asp-page-handler="Refresh" asp-route-id="@endpoint.Id" class="d-inline">
+                                    <button type="submit" class="btn btn-tool">
+                                        <i class="fas fa-sync-alt mr-1"></i>Refresh
+                                    </button>
+                                </form>
                             </div>
                         </div>
-                    </div>
-                    <div class="card-footer">
-                        Header values and secrets will be summarized safely here once YAML loading is wired in.
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Latest Poll Snapshot</h3>
-                    </div>
-                    <div class="card-body">
-                        <strong>Last Checked</strong>
-                        <p class="text-muted">2026-03-18 09:14:12 UTC</p>
-                        <hr />
-                        <strong>Last Successful</strong>
-                        <p class="text-muted">2026-03-18 09:13:42 UTC</p>
-                        <hr />
-                        <strong>Duration</strong>
-                        <p class="text-muted">612 ms</p>
-                        <hr />
-                        <strong>Current Error</strong>
-                        <p class="text-muted mb-0">Downstream SQL dependency exceeded threshold.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Nested Health Checks</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="health-tree">
-                            <div class="timeline timeline-inverse">
-                                <div>
-                                    <i class="fas fa-server bg-primary"></i>
-                                    <div class="timeline-item">
-                                        <h3 class="timeline-header">
-                                            API root status
-                                            <span class="badge badge-warning">Degraded</span>
-                                        </h3>
-                                        <div class="timeline-body">
-                                            Overall endpoint response will be normalized into a recursive tree in Phase 6.
-                                        </div>
-                                    </div>
+                        <div class="card-body">
+                            <div class="metric-list">
+                                <div class="metric-item">
+                                    <span class="metric-label">Endpoint Id</span>
+                                    <div class="metric-value">@endpoint.Id</div>
                                 </div>
-                                <div>
-                                    <i class="fas fa-database bg-success"></i>
-                                    <div class="timeline-item">
-                                        <h3 class="timeline-header">
-                                            database
-                                            <span class="badge badge-success">Healthy</span>
-                                        </h3>
-                                        <div class="timeline-body">
-                                            Connection check passed in 48 ms.
-                                        </div>
-                                    </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Name</span>
+                                    <div class="metric-value">@endpoint.Name</div>
                                 </div>
-                                <div>
-                                    <i class="fas fa-network-wired bg-warning"></i>
-                                    <div class="timeline-item">
-                                        <h3 class="timeline-header">
-                                            downstream-services
-                                            <span class="badge badge-warning">Degraded</span>
-                                        </h3>
-                                        <div class="timeline-body">
-                                            Placeholder branch for nested checks:
-                                            cache healthy, messaging healthy, reporting slow.
-                                        </div>
-                                    </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">URL</span>
+                                    <div class="metric-value endpoint-url">@endpoint.Url</div>
                                 </div>
-                                <div>
-                                    <i class="far fa-clock bg-gray"></i>
+                                <div class="metric-item">
+                                    <span class="metric-label">Polling Frequency</span>
+                                    <div class="metric-value">@endpoint.FrequencyText</div>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Timeout</span>
+                                    <div class="metric-value">@endpoint.TimeoutText</div>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Current Status</span>
+                                    <div class="metric-value">
+                                        <span class="badge @endpoint.StatusBadgeClass">@endpoint.Status</span>
+                                        @if (endpoint.IsPolling)
+                                        {
+                                            <small class="d-block text-info mt-1">Polling now</small>
+                                        }
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        <div class="card-footer">
+                            @if (endpoint.Headers.Count == 0)
+                            {
+                                <span class="text-muted">No custom request headers configured.</span>
+                            }
+                            else
+                            {
+                                <div class="text-muted mb-1">Configured headers</div>
+                                <ul class="mb-0 pl-3">
+                                    @foreach (var header in endpoint.Headers)
+                                    {
+                                        <li><code>@header.Name</code>: @header.ValuePreview</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Latest Poll Snapshot</h3>
+                        </div>
+                        <div class="card-body">
+                            <strong>Last Checked</strong>
+                            <p class="text-muted">@endpoint.LastCheckedText</p>
+                            <hr />
+                            <strong>Last Successful</strong>
+                            <p class="text-muted">@endpoint.LastSuccessfulText</p>
+                            <hr />
+                            <strong>Duration</strong>
+                            <p class="text-muted">@endpoint.DurationText</p>
+                            <hr />
+                            <strong>Current Error</strong>
+                            <p class="text-muted mb-0">@(string.IsNullOrWhiteSpace(endpoint.ErrorText) ? "None" : endpoint.ErrorText)</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Raw Payload Preview</h3>
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Nested Health Checks</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (endpoint.Nodes.Count == 0)
+                            {
+                                <div class="text-muted">No parsed health checks are available yet. Trigger a refresh to fetch the latest endpoint response.</div>
+                            }
+                            else
+                            {
+                                <div class="health-tree">
+                                    <div class="timeline timeline-inverse">
+                                        @foreach (var node in endpoint.Nodes)
+                                        {
+                                            <div>
+                                                <i class="fas fa-heartbeat bg-primary"></i>
+                                                <partial name="_HealthNode" model="node" />
+                                            </div>
+                                        }
+                                        <div>
+                                            <i class="far fa-clock bg-gray"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <pre class="payload-preview mb-0"><code>{
-  "status": "Degraded",
-  "entries": {
-    "database": { "status": "Healthy", "duration": "00:00:00.048" },
-    "downstream-services": {
-      "status": "Degraded",
-      "children": {
-        "cache": { "status": "Healthy" },
-        "messaging": { "status": "Healthy" },
-        "reporting": { "status": "Degraded" }
-      }
-    }
-  }
-}</code></pre>
-                    </div>
+
+                    @if (endpoint.ShowRawPayload)
+                    {
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Raw Payload Preview</h3>
+                            </div>
+                            <div class="card-body">
+                                @if (string.IsNullOrWhiteSpace(endpoint.RawPayload))
+                                {
+                                    <div class="text-muted">No raw payload has been captured yet.</div>
+                                }
+                                else
+                                {
+                                    <pre class="payload-preview mb-0"><code>@endpoint.RawPayload</code></pre>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
+}

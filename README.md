@@ -20,9 +20,9 @@ Implemented so far:
 - Phase 5: HTTP endpoint poller and tests
 - Phase 6: health response parser and tests
 - Phase 7: background polling scheduler and tests
+- Phase 8: manual refresh actions and page-model tests
 
 Not implemented yet:
-- manual refresh actions
 - real dashboard data binding
 - CI/CD workflows
 
@@ -155,6 +155,17 @@ Current behavior:
 - keeps slow endpoints from blocking other endpoint loops
 - already exposes a scheduler interface that Phase 8 can reuse for manual refresh actions
 
+### Manual Refresh Actions
+
+The dashboard and endpoint details pages now expose working manual refresh actions through Razor Pages handlers.
+
+Current manual refresh behavior:
+- dashboard supports refresh-all and refresh-single-endpoint actions
+- endpoint details page supports refresh for the current endpoint
+- refresh actions reuse the scheduler interface instead of duplicating poll logic
+- user feedback is shown through page status messages after each action
+- dashboard and details pages now read live configured endpoints and current runtime state instead of hard-coded placeholder rows
+
 ## Running The App
 
 From the repository root:
@@ -204,6 +215,10 @@ Current automated coverage includes:
 - scheduler state update handling
 - scheduler overlap prevention
 - scheduler independent polling for enabled endpoints only
+- dashboard page-model refresh-all behavior
+- dashboard page-model refresh-single behavior
+- endpoint details page-model refresh behavior
+- endpoint details not-found behavior
 
 Test file:
 - [`tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs`](tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs)
@@ -211,6 +226,8 @@ Test file:
 - [`tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs`](tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs)
 - [`tests/ApiHealthDashboard.Tests/Parsing/HealthResponseParserTests.cs`](tests/ApiHealthDashboard.Tests/Parsing/HealthResponseParserTests.cs)
 - [`tests/ApiHealthDashboard.Tests/Scheduling/PollingSchedulerServiceTests.cs`](tests/ApiHealthDashboard.Tests/Scheduling/PollingSchedulerServiceTests.cs)
+- [`tests/ApiHealthDashboard.Tests/Pages/IndexModelTests.cs`](tests/ApiHealthDashboard.Tests/Pages/IndexModelTests.cs)
+- [`tests/ApiHealthDashboard.Tests/Pages/Endpoints/DetailsModelTests.cs`](tests/ApiHealthDashboard.Tests/Pages/Endpoints/DetailsModelTests.cs)
 
 ## Important Constraints
 
@@ -229,7 +246,7 @@ Test file:
 - [x] Phase 5 - HTTP poller
 - [x] Phase 6 - Health response parser
 - [x] Phase 7 - Polling scheduler
-- [ ] Phase 8 - Manual refresh actions
+- [x] Phase 8 - Manual refresh actions
 - [ ] Phase 9 - Dashboard summary page
 - [ ] Phase 10 - Endpoint details page
 - [ ] Phase 11 - Error handling and logging
