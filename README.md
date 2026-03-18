@@ -25,6 +25,7 @@ Implemented so far:
 - Phase 10: endpoint details diagnostics view and tests
 - Phase 11: error handling and structured logging improvements
 - Phase 12: automated test expansion for invalid and edge-case coverage
+- Phase 13: publish and deployment validation
 
 Not implemented yet:
 - CI/CD workflows
@@ -79,6 +80,7 @@ Current configuration support:
 - endpoint `id`, `name`, `url`, `enabled`, `frequencySeconds`, `timeoutSeconds`
 - endpoint `headers`, `includeChecks`, `excludeChecks`
 - `${ENV_VAR}` substitution in YAML values
+- `endpoints.yaml` is copied to both build and publish output by default
 
 Validation currently checks:
 - required endpoint id, name, and url
@@ -215,6 +217,19 @@ Recent test expansion includes:
 - scheduler coverage for parser-error snapshots and refresh-all enabled-endpoint counting
 - page-model coverage for default details routing and missing endpoint-id refresh actions
 
+### Publish And Deployment Validation
+
+The app has now been validated as a portable publishable deployment, not just a local source checkout.
+
+Validated deployment behavior:
+- framework-dependent publish completes successfully
+- self-contained Windows `win-x64` publish completes successfully
+- published output includes `endpoints.yaml`, `appsettings.json`, and bundled local AdminLTE assets
+- both published variants run directly from their publish folders and return HTTP `200` for `/`
+- bundled CSS assets load from the published folders without relying on external CDNs
+- no database package or runtime dependency is required
+- no Node.js, npm, yarn, or frontend build tool dependency is required
+
 ## Running The App
 
 From the repository root:
@@ -239,6 +254,25 @@ dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj
 ```powershell
 dotnet test .\ApiHealthDashboard.sln -c Release
 ```
+
+## Publishing
+
+Framework-dependent publish:
+
+```powershell
+dotnet publish .\src\ApiHealthDashboard\ApiHealthDashboard.csproj -c Release --self-contained false
+```
+
+Self-contained Windows publish:
+
+```powershell
+dotnet publish .\src\ApiHealthDashboard\ApiHealthDashboard.csproj -c Release -r win-x64 --self-contained true
+```
+
+Deployment notes:
+- the published folder is runnable on its own with the included `endpoints.yaml`
+- local UI assets under `wwwroot/adminlte` remain bundled after publish
+- no additional database or Node.js setup is required for the published app
 
 Current automated coverage includes:
 - valid YAML load
@@ -316,7 +350,7 @@ Test file:
 - [x] Phase 10 - Endpoint details page
 - [x] Phase 11 - Error handling and logging
 - [x] Phase 12 - Automated tests expansion
-- [ ] Phase 13 - Publish and deployment validation
+- [x] Phase 13 - Publish and deployment validation
 - [ ] Phase 14 - GitHub Actions CI/CD
 
 ## Future Plans

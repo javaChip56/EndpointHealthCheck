@@ -11,8 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Update="endpoints.yaml">
+    <None Remove="endpoints.yaml" />
+    <Content Include="endpoints.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
