@@ -3,12 +3,14 @@ name: CI Build
 on:
   push:
     branches:
-      - main
+      - master
       - develop
+      - enhancements
   pull_request:
     branches:
-      - main
+      - master
       - develop
+      - enhancements
 
 permissions:
   contents: read

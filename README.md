@@ -262,9 +262,9 @@ Current automation files:
 - [`.github/dependabot.yml`](.github/dependabot.yml)
 
 Current automation behavior:
-- CI runs on pushes to `main` and `develop`, and on pull requests targeting those branches
+- CI runs on pushes to `master`, `develop`, and `enhancements`, and on pull requests targeting those branches
 - CI restores, builds in Release mode, runs tests, and uploads TRX test results
-- CodeQL runs for C# on pushes to `main`, pull requests targeting `main`, and manual dispatches
+- CodeQL runs for C# on pushes to `master`, `develop`, and `enhancements`, pull requests targeting those branches, and manual dispatches
 - Release automation verifies the solution, publishes self-contained artifacts for `win-x64` and `linux-x64`, packages them, generates checksums, and uploads them to the GitHub release
 - Dependabot monitors both NuGet dependencies and GitHub Actions workflow dependencies on a weekly schedule
 
@@ -317,7 +317,7 @@ Deployment notes:
 ## CI/CD Automation
 
 Repository automation now includes:
-- CI build and test workflow for `main` and `develop`
+- CI build and test workflow for `master`, `develop`, and `enhancements`
 - CodeQL SAST workflow for C#
 - release packaging workflow for self-contained GitHub release artifacts
 - Dependabot configuration for NuGet and GitHub Actions dependencies
