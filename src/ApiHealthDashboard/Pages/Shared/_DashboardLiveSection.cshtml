@@ -130,6 +130,7 @@
                                 <th>Last Checked</th>
                                 <th>Last Successful</th>
                                 <th>Duration</th>
+                                <th>Recent Signal</th>
                                 <th>Frequency</th>
                                 <th>Error</th>
                                 <th>Actions</th>
@@ -175,6 +176,23 @@
                                     <td>@endpoint.LastCheckedText</td>
                                     <td>@endpoint.LastSuccessfulText</td>
                                     <td>@endpoint.DurationText</td>
+                                    <td class="dashboard-recent-cell">
+                                        @if (!endpoint.HasRecentSamples)
+                                        {
+                                            <span class="text-muted">No recent samples</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="sample-indicator-strip" aria-label="Recent poll signal">
+                                                @foreach (var indicator in endpoint.RecentIndicators)
+                                                {
+                                                    <span class="sample-indicator @indicator.BadgeClass" title="@indicator.Summary"></span>
+                                                }
+                                            </div>
+                                            <div><small class="text-muted">@endpoint.RecentSuccessRateText</small></div>
+                                            <div><small class="text-muted">@endpoint.RecentAverageDurationText • @endpoint.RecentFailureCountText</small></div>
+                                        }
+                                    </td>
                                     <td>@endpoint.FrequencyText</td>
                                     <td class="dashboard-error-cell">
                                         @if (string.IsNullOrWhiteSpace(endpoint.ErrorText))
@@ -198,7 +216,7 @@
                                 </tr>
                             }
                             <tr data-endpoint-search-empty hidden>
-                                <td colspan="9" class="text-center text-muted py-4">
+                                <td colspan="10" class="text-center text-muted py-4">
                                     No endpoints match your search.
                                 </td>
                             </tr>

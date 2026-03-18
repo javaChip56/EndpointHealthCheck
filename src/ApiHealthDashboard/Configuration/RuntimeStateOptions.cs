@@ -16,6 +16,8 @@ public sealed class RuntimeStateOptions
 
     public double OrphanedStateFileRetentionHours { get; set; } = 5;
 
+    public int RecentSampleLimit { get; set; } = 25;
+
     public string ResolveDirectoryPath(string contentRootPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contentRootPath);
@@ -41,5 +43,10 @@ public sealed class RuntimeStateOptions
         return OrphanedStateFileRetentionHours <= 0
             ? TimeSpan.Zero
             : TimeSpan.FromHours(OrphanedStateFileRetentionHours);
+    }
+
+    public int GetRecentSampleLimit()
+    {
+        return Math.Max(RecentSampleLimit, 0);
     }
 }

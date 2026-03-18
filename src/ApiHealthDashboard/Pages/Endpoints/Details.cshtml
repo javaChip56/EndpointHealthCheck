@@ -212,6 +212,43 @@ else
 
                     <div class="card">
                         <div class="card-header">
+                            <h3 class="card-title">Recent Poll Metrics</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasRecentSamples)
+                            {
+                                <div class="text-muted">No recent samples have been retained yet for this endpoint.</div>
+                            }
+                            else
+                            {
+                                <div class="metric-list">
+                                    <div class="metric-item">
+                                        <span class="metric-label">Retained samples</span>
+                                        <div class="metric-value">@endpoint.RecentSampleCount</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Recent success rate</span>
+                                        <div class="metric-value">@endpoint.RecentSuccessRateText</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Recent failures</span>
+                                        <div class="metric-value">@endpoint.RecentFailureCountText</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Average duration</span>
+                                        <div class="metric-value">@endpoint.RecentAverageDurationText</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Last status change</span>
+                                        <div class="metric-value">@endpoint.LastStatusChangeText</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
                             <h3 class="card-title">Request Filters</h3>
                         </div>
                         <div class="card-body">
@@ -315,6 +352,46 @@ else
                                     @foreach (var node in endpoint.Nodes)
                                     {
                                         <partial name="_HealthNode" model="node" />
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Poll Activity</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasRecentSamples)
+                            {
+                                <div class="text-muted">Recent poll activity will appear here after enough runtime samples have been collected.</div>
+                            }
+                            else
+                            {
+                                <div class="recent-poll-list">
+                                    @foreach (var sample in endpoint.RecentSamples)
+                                    {
+                                        <div class="recent-poll-item">
+                                            <div class="recent-poll-heading">
+                                                <div class="recent-poll-badges">
+                                                    <span class="badge @sample.StatusBadgeClass">@sample.Status</span>
+                                                    <span class="badge @sample.ResultKindBadgeClass">@sample.ResultKind</span>
+                                                </div>
+                                                <div class="recent-poll-time">@sample.CheckedText</div>
+                                            </div>
+                                            <div class="recent-poll-meta">
+                                                <span>@sample.DurationText</span>
+                                                @if (sample.HasError)
+                                                {
+                                                    <span class="text-danger">@sample.ErrorSummary</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No error</span>
+                                                }
+                                            </div>
+                                        </div>
                                     }
                                 </div>
                             }

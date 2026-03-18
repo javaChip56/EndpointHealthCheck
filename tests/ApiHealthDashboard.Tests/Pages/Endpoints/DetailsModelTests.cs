@@ -96,6 +96,24 @@ public sealed class DetailsModelTests
             LastSuccessfulUtc = new DateTimeOffset(2026, 03, 18, 8, 29, 0, TimeSpan.Zero),
             DurationMs = 420,
             LastError = "Database latency exceeded threshold.",
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 18, 8, 28, 0, TimeSpan.Zero),
+                    Status = "Healthy",
+                    DurationMs = 190,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 18, 8, 30, 0, TimeSpan.Zero),
+                    Status = "Degraded",
+                    DurationMs = 420,
+                    ResultKind = "Success",
+                    ErrorSummary = "Database latency exceeded threshold."
+                }
+            ],
             Snapshot = new HealthSnapshot
             {
                 OverallStatus = "Degraded",
@@ -152,6 +170,12 @@ public sealed class DetailsModelTests
         Assert.Equal(["cache"], model.Endpoint.ExcludeChecks);
         Assert.Equal(3, model.Endpoint.SnapshotMetadata.Count);
         Assert.Equal("(empty)", model.Endpoint.SnapshotMetadata.Single(static item => item.Name == "tags").Value);
+        Assert.Equal(2, model.Endpoint.RecentSampleCount);
+        Assert.Equal("50% success", model.Endpoint.RecentSuccessRateText);
+        Assert.Equal("1 failure", model.Endpoint.RecentFailureCountText);
+        Assert.Equal("305 ms", model.Endpoint.RecentAverageDurationText);
+        Assert.Equal("2026-03-18 08:30:00 UTC", model.Endpoint.LastStatusChangeText);
+        Assert.Equal(2, model.Endpoint.RecentSamples.Count);
         Assert.Equal(
             "{\n  \"status\": \"Degraded\"\n}",
             model.Endpoint.RawPayload!.Replace("\r\n", "\n", StringComparison.Ordinal));

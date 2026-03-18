@@ -35,6 +35,16 @@ public sealed class InMemoryEndpointStateStoreTests
             Status = "Healthy",
             LastError = "none",
             IsPolling = true,
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T00:00:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 42,
+                    ResultKind = "Success"
+                }
+            ],
             Snapshot = new HealthSnapshot
             {
                 OverallStatus = "Healthy",
@@ -64,11 +74,14 @@ public sealed class InMemoryEndpointStateStoreTests
         Assert.NotNull(storedState);
         Assert.Equal("Healthy", storedState!.Status);
         Assert.Equal("Healthy", storedState.Snapshot!.Nodes[0].Status);
+        Assert.Single(storedState.RecentSamples);
 
         storedState.Snapshot.Nodes[0].Children[0].Status = "Unhealthy";
+        storedState.RecentSamples[0].Status = "Unhealthy";
 
         var storedStateAgain = store.Get("orders-api");
         Assert.Equal("Healthy", storedStateAgain!.Snapshot!.Nodes[0].Children[0].Status);
+        Assert.Equal("Healthy", storedStateAgain.RecentSamples[0].Status);
     }
 
     [Fact]

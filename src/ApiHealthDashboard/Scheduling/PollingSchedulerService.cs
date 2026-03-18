@@ -15,6 +15,7 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
     private readonly IEndpointPoller _endpointPoller;
     private readonly IHealthResponseParser _healthResponseParser;
     private readonly ILogger<PollingSchedulerService> _logger;
+    private readonly RuntimeStateOptions _runtimeStateOptions;
     private readonly IEndpointStateStore _stateStore;
     private readonly TimeProvider _timeProvider;
     private readonly object _syncRoot = new();
@@ -28,6 +29,7 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         IEndpointStateStore stateStore,
         IEndpointPoller endpointPoller,
         IHealthResponseParser healthResponseParser,
+        RuntimeStateOptions runtimeStateOptions,
         TimeProvider timeProvider,
         ILogger<PollingSchedulerService> logger)
     {
@@ -35,6 +37,7 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         _stateStore = stateStore;
         _endpointPoller = endpointPoller;
         _healthResponseParser = healthResponseParser;
+        _runtimeStateOptions = runtimeStateOptions;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -238,6 +241,8 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             updatedState.LastError = result.ErrorMessage;
         }
 
+        AppendRecentSample(updatedState, result);
+
         _stateStore.Upsert(updatedState);
 
         _logger.LogInformation(
@@ -258,6 +263,48 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             EndpointName = endpoint.Name,
             Status = "Unknown"
         };
+    }
+
+    private void AppendRecentSample(EndpointState state, PollResult result)
+    {
+        var recentSampleLimit = _runtimeStateOptions.GetRecentSampleLimit();
+        if (recentSampleLimit <= 0)
+        {
+            state.RecentSamples.Clear();
+            return;
+        }
+
+        state.RecentSamples.Add(new RecentPollSample
+        {
+            CheckedUtc = result.CheckedUtc,
+            Status = state.Status,
+            DurationMs = result.DurationMs,
+            ResultKind = result.Kind.ToString(),
+            ErrorSummary = SummarizeError(state.LastError)
+        });
+
+        if (state.RecentSamples.Count <= recentSampleLimit)
+        {
+            return;
+        }
+
+        var removeCount = state.RecentSamples.Count - recentSampleLimit;
+        state.RecentSamples.RemoveRange(0, removeCount);
+    }
+
+    private static string? SummarizeError(string? errorText)
+    {
+        if (string.IsNullOrWhiteSpace(errorText))
+        {
+            return null;
+        }
+
+        const int maxLength = 160;
+        var trimmed = errorText.Trim();
+
+        return trimmed.Length <= maxLength
+            ? trimmed
+            : $"{trimmed[..(maxLength - 3)]}...";
     }
 
     private static bool TryGetParserError(HealthSnapshot snapshot, out string parserError)

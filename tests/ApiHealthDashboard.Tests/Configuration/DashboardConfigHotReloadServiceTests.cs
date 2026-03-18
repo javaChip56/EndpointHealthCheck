@@ -59,6 +59,7 @@ public sealed class DashboardConfigHotReloadServiceTests : IDisposable
             stateStore,
             new StubEndpointPoller(),
             new StubHealthResponseParser(),
+            new RuntimeStateOptions(),
             TimeProvider.System,
             NullLogger<PollingSchedulerService>.Instance);
 

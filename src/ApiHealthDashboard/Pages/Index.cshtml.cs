@@ -1,6 +1,7 @@
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Scheduling;
+using ApiHealthDashboard.Statistics;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -187,6 +188,14 @@ public class IndexModel : PageModel
 
         public string DurationText { get; init; } = "-";
 
+        public string RecentSuccessRateText { get; init; } = "No recent samples";
+
+        public string RecentAverageDurationText { get; init; } = "-";
+
+        public string RecentFailureCountText { get; init; } = "0 failures";
+
+        public IReadOnlyList<RecentSampleIndicatorViewModel> RecentIndicators { get; init; } = [];
+
         public string? ErrorText { get; init; }
 
         public string ErrorSummary => string.IsNullOrWhiteSpace(ErrorText) ? "None" : ErrorText;
@@ -199,9 +208,15 @@ public class IndexModel : PageModel
 
         public bool ShowStatusDescription => !string.Equals(StatusDescription, Status, StringComparison.OrdinalIgnoreCase);
 
+        public bool HasRecentSamples => RecentIndicators.Count > 0;
+
         public static EndpointSummaryViewModel From(EndpointConfig endpoint, EndpointState? state)
         {
             var status = state?.Status ?? "Unknown";
+            var recentSamples = state?.RecentSamples
+                .Select(static sample => sample.Clone())
+                .ToArray() ?? [];
+            var recentMetrics = RecentPollSampleMetricsCalculator.Calculate(recentSamples);
 
             return new EndpointSummaryViewModel
             {
@@ -219,7 +234,34 @@ public class IndexModel : PageModel
                 LastCheckedText = FormatDateTime(state?.LastCheckedUtc),
                 LastSuccessfulText = FormatDateTime(state?.LastSuccessfulUtc),
                 DurationText = state?.DurationMs is long durationMs ? $"{durationMs} ms" : "-",
+                RecentSuccessRateText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.SuccessRatePercent}% success"
+                    : "No recent samples",
+                RecentAverageDurationText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.AverageDurationMs} ms avg"
+                    : "-",
+                RecentFailureCountText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.FailureCount} failure{(recentMetrics.FailureCount == 1 ? string.Empty : "s")}"
+                    : "0 failures",
+                RecentIndicators = recentSamples
+                    .OrderByDescending(static sample => sample.CheckedUtc)
+                    .Take(8)
+                    .Select(CreateRecentIndicator)
+                    .ToArray(),
                 ErrorText = state?.LastError
+            };
+        }
+
+        private static RecentSampleIndicatorViewModel CreateRecentIndicator(RecentPollSample sample)
+        {
+            var summary = string.IsNullOrWhiteSpace(sample.ErrorSummary)
+                ? $"{sample.Status} via {sample.ResultKind}"
+                : $"{sample.Status} via {sample.ResultKind}: {sample.ErrorSummary}";
+
+            return new RecentSampleIndicatorViewModel
+            {
+                BadgeClass = ToRecentIndicatorClass(sample),
+                Summary = $"{sample.CheckedUtc.ToUniversalTime():yyyy-MM-dd HH:mm:ss 'UTC'} - {summary}"
             };
         }
 
@@ -280,5 +322,29 @@ public class IndexModel : PageModel
                 _ => "badge-info"
             };
         }
+
+        private static string ToRecentIndicatorClass(RecentPollSample sample)
+        {
+            if (!string.IsNullOrWhiteSpace(sample.ErrorSummary) ||
+                !string.Equals(sample.ResultKind, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                return "sample-indicator-failure";
+            }
+
+            return sample.Status switch
+            {
+                "Healthy" => "sample-indicator-healthy",
+                "Degraded" => "sample-indicator-degraded",
+                "Unhealthy" => "sample-indicator-unhealthy",
+                _ => "sample-indicator-unknown"
+            };
+        }
+    }
+
+    public sealed class RecentSampleIndicatorViewModel
+    {
+        public required string BadgeClass { get; init; }
+
+        public required string Summary { get; init; }
     }
 }

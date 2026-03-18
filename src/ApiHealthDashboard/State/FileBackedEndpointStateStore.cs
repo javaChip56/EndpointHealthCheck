@@ -354,6 +354,8 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
 
         public HealthSnapshot? Snapshot { get; set; }
 
+        public List<RecentPollSample> RecentSamples { get; set; } = new();
+
         public static PersistedEndpointState FromRuntimeState(EndpointState state)
         {
             return new PersistedEndpointState
@@ -365,7 +367,8 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
                 LastSuccessfulUtc = state.LastSuccessfulUtc,
                 DurationMs = state.DurationMs,
                 LastError = state.LastError,
-                Snapshot = state.Snapshot?.Clone()
+                Snapshot = state.Snapshot?.Clone(),
+                RecentSamples = state.RecentSamples.Select(static sample => sample.Clone()).ToList()
             };
         }
 
@@ -381,6 +384,7 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
                 DurationMs = DurationMs,
                 LastError = LastError,
                 Snapshot = Snapshot?.Clone(),
+                RecentSamples = RecentSamples.Select(static sample => sample.Clone()).ToList(),
                 IsPolling = false
             };
         }

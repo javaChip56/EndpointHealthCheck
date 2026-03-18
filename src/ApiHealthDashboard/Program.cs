@@ -29,6 +29,8 @@ builder.Services.Configure<ImportUiOptions>(
     builder.Configuration.GetSection(ImportUiOptions.SectionName));
 builder.Services.Configure<RuntimeStateOptions>(
     builder.Configuration.GetSection(RuntimeStateOptions.SectionName));
+builder.Services.AddSingleton(static serviceProvider =>
+    serviceProvider.GetRequiredService<IOptions<RuntimeStateOptions>>().Value);
 builder.Services.AddSingleton<DashboardConfigValidator>();
 builder.Services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 builder.Services.AddSingleton(static serviceProvider =>

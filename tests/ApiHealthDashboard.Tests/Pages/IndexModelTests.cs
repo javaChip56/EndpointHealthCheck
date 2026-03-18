@@ -101,7 +101,25 @@ public sealed class IndexModelTests
             EndpointId = "billing-api",
             EndpointName = "Billing API",
             Status = "Degraded",
-            LastError = "Dependency timeout"
+            LastError = "Dependency timeout",
+            RecentSamples =
+            [
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 0, 0, TimeSpan.Zero),
+                    Status = "Healthy",
+                    DurationMs = 120,
+                    ResultKind = "Success"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 1, 0, TimeSpan.Zero),
+                    Status = "Degraded",
+                    DurationMs = 340,
+                    ResultKind = "Success",
+                    ErrorSummary = "Dependency timeout"
+                }
+            ]
         });
 
         var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
@@ -118,6 +136,8 @@ public sealed class IndexModelTests
         Assert.Single(model.ProblemEndpoints);
         Assert.Equal("billing-api", model.ProblemEndpoints[0].Id);
         Assert.Equal(EndpointPriority.Critical, model.ProblemEndpoints[0].Priority);
+        Assert.Equal("50% success", model.ProblemEndpoints[0].RecentSuccessRateText);
+        Assert.Equal("230 ms avg", model.ProblemEndpoints[0].RecentAverageDurationText);
     }
 
     [Fact]

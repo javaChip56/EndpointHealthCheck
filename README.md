@@ -32,6 +32,7 @@ Implemented so far:
 - Post-v1: YAML hot-reload for dashboard and endpoint files
 - Post-v1: per-endpoint current-state persistence with compact JSON files
 - Post-v1: runtime-state cleanup and retention settings for orphaned persisted state files
+- Post-v1: recent poll sample retention with derived dashboard and details metrics
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -107,6 +108,7 @@ The app now includes a runtime endpoint state store with an in-memory cache and 
 
 Current runtime models:
 - [`src/ApiHealthDashboard/Domain/EndpointState.cs`](src/ApiHealthDashboard/Domain/EndpointState.cs)
+- [`src/ApiHealthDashboard/Domain/RecentPollSample.cs`](src/ApiHealthDashboard/Domain/RecentPollSample.cs)
 - [`src/ApiHealthDashboard/Domain/HealthSnapshot.cs`](src/ApiHealthDashboard/Domain/HealthSnapshot.cs)
 - [`src/ApiHealthDashboard/Domain/HealthNode.cs`](src/ApiHealthDashboard/Domain/HealthNode.cs)
 
@@ -122,6 +124,7 @@ Current behavior:
 - can persist the latest current state for each endpoint to a compact JSON file under a configurable runtime-state directory
 - restores persisted current state on startup for configured endpoints and resets any stale `IsPolling` flag to `false`
 - can clean up orphaned persisted state files on a configurable interval after a configurable retention window
+- retains a configurable rolling window of recent poll samples per endpoint for derived runtime metrics
 - supports get-all, get-one, upsert, and reinitialize operations
 - returns deep copies so callers cannot mutate internal store state accidentally
 - uses thread-safe locking for concurrent access
@@ -211,7 +214,7 @@ Current dashboard behavior:
 - includes a client-side search field for filtering endpoint rows by name, id, status, or error text
 - refreshes the live dashboard section with same-origin timed GET requests instead of reloading the whole page
 - sorts endpoint summaries and active issues by endpoint priority before name
-- renders a live endpoint table with last check, duration, error summary, and manual refresh actions
+- renders a live endpoint table with last check, duration, recent signal metrics, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
 - shows a clearer empty state when no endpoints are configured
 
@@ -250,6 +253,7 @@ Current details-page behavior:
 - shows endpoint metadata including enabled state, priority, frequency, timeout, and masked request headers
 - shows request filter configuration for included and excluded checks
 - summarizes the latest poll with status, timings, retrieved timestamp, and current error
+- shows retained recent sample metrics including success rate, failure count, average duration, last status change, and recent activity
 - renders top-level and nested health checks recursively with native expand and collapse support
 - surfaces snapshot metadata captured from the parsed response
 - shows the raw payload section only when enabled in configuration
@@ -328,6 +332,8 @@ Current cleanup settings:
 - `RuntimeState:CleanupIntervalMinutes` to control how often orphan cleanup runs
 - `RuntimeState:DeleteOrphanedStateFiles` to enable deletion of persisted state files that no longer belong to configured endpoints
 - `RuntimeState:OrphanedStateFileRetentionHours` to keep orphaned state files for a configurable grace period before deletion
+- `RuntimeState:RecentSampleLimit` to cap how many recent poll samples are retained per endpoint
+- `RuntimeState:RecentSampleLimit` to cap how many recent poll samples are retained per endpoint
 
 You can also override it with an environment variable:
 
@@ -474,7 +480,7 @@ Test file:
 - Do not use Xabaril health check UI packages
 - Do not rely on CDN-hosted frontend assets
 - Do not require a database
-- Keep runtime state in memory only
+- Keep active runtime state in memory and persisted runtime files lightweight
 - Prefer small, focused services
 
 ## Development Progress
@@ -497,9 +503,10 @@ Test file:
 ## Future Plans
 
 These are planned enhancements after the current v1 path:
+- next up: add mini trend visuals and short status history views based on the retained recent poll samples already captured in runtime state
 - optionally add short status history and mini trends so the dashboard can show recent health changes instead of only the latest snapshot
 - add configurable retention controls for future persisted history files once trend capture is introduced
-- optionally add per-endpoint history files or embedded `recentSamples` arrays once trend capture is introduced
+- optionally add per-endpoint history files once the embedded recent-sample window is no longer sufficient
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API
 
 ## Notes For Ongoing Updates

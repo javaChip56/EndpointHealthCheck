@@ -208,6 +208,42 @@ body {
   white-space: normal;
 }
 
+.dashboard-recent-cell {
+  min-width: 14rem;
+}
+
+.sample-indicator-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+.sample-indicator {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+.sample-indicator-healthy {
+  background: #28a745;
+}
+
+.sample-indicator-degraded {
+  background: #f59e0b;
+}
+
+.sample-indicator-unhealthy,
+.sample-indicator-failure {
+  background: #dc3545;
+}
+
+.sample-indicator-unknown {
+  background: #6c757d;
+}
+
 .dashboard-card-tools {
   display: flex;
   align-items: center;
@@ -519,6 +555,45 @@ body {
 
 .health-node-data li:first-child {
   border-top: 0;
+}
+
+.recent-poll-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.recent-poll-item {
+  padding: 0.9rem 1rem;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.recent-poll-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.recent-poll-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.recent-poll-time {
+  font-size: 0.84rem;
+  color: #6b7280;
+}
+
+.recent-poll-meta {
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
 }
 
 @media (max-width: 991.98px) {

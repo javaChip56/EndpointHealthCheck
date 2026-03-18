@@ -2,6 +2,7 @@ using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Formatting;
 using ApiHealthDashboard.Scheduling;
+using ApiHealthDashboard.Statistics;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -142,6 +143,16 @@ public class DetailsModel : PageModel
 
         public string DurationText { get; init; } = "-";
 
+        public int RecentSampleCount { get; init; }
+
+        public string RecentSuccessRateText { get; init; } = "No recent samples";
+
+        public string RecentFailureCountText { get; init; } = "0 failures";
+
+        public string RecentAverageDurationText { get; init; } = "-";
+
+        public string LastStatusChangeText { get; init; } = "No recent change";
+
         public string? ErrorText { get; init; }
 
         public string ErrorSummary => string.IsNullOrWhiteSpace(ErrorText) ? "None" : ErrorText;
@@ -180,6 +191,10 @@ public class DetailsModel : PageModel
 
         public bool HasSnapshotMetadata => SnapshotMetadata.Count > 0;
 
+        public bool HasRecentSamples => RecentSamples.Count > 0;
+
+        public IReadOnlyList<RecentPollSampleViewModel> RecentSamples { get; init; } = [];
+
         public static EndpointDetailsViewModel From(
             EndpointConfig endpoint,
             EndpointState? state,
@@ -190,6 +205,10 @@ public class DetailsModel : PageModel
             var nodes = state?.Snapshot?.Nodes.Select(static node => node.Clone()).ToArray() ?? [];
             var flattenedNodes = FlattenNodes(nodes).ToArray();
             var snapshotDurationMs = state?.DurationMs ?? state?.Snapshot?.DurationMs;
+            var recentSamples = state?.RecentSamples
+                .Select(static sample => sample.Clone())
+                .ToArray() ?? [];
+            var recentMetrics = RecentPollSampleMetricsCalculator.Calculate(recentSamples);
 
             return new EndpointDetailsViewModel
             {
@@ -210,6 +229,19 @@ public class DetailsModel : PageModel
                 LastSuccessfulText = FormatDateTime(state?.LastSuccessfulUtc),
                 LastRetrievedText = FormatDateTime(state?.Snapshot?.RetrievedUtc),
                 DurationText = snapshotDurationMs is long durationMs ? $"{durationMs} ms" : "-",
+                RecentSampleCount = recentMetrics.SampleCount,
+                RecentSuccessRateText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.SuccessRatePercent}% success"
+                    : "No recent samples",
+                RecentFailureCountText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.FailureCount} failure{(recentMetrics.FailureCount == 1 ? string.Empty : "s")}"
+                    : "0 failures",
+                RecentAverageDurationText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.AverageDurationMs} ms"
+                    : "-",
+                LastStatusChangeText = recentMetrics.LastStatusChangeUtc is DateTimeOffset lastStatusChangeUtc
+                    ? FormatDateTime(lastStatusChangeUtc)
+                    : "No recent change",
                 ErrorText = state?.LastError,
                 Headers = endpoint.Headers
                     .OrderBy(static header => header.Key, StringComparer.OrdinalIgnoreCase)
@@ -242,7 +274,12 @@ public class DetailsModel : PageModel
                 UnhealthyCheckCount = flattenedNodes.Count(static node => node.Status == "Unhealthy"),
                 UnknownCheckCount = flattenedNodes.Count(static node => node.Status is not ("Healthy" or "Degraded" or "Unhealthy")),
                 RawPayload = showRawPayload ? FormatPayloadPreview(state?.Snapshot?.RawPayload) : null,
-                ShowRawPayload = showRawPayload
+                ShowRawPayload = showRawPayload,
+                RecentSamples = recentSamples
+                    .OrderByDescending(static sample => sample.CheckedUtc)
+                    .Take(10)
+                    .Select(CreateRecentSampleViewModel)
+                    .ToArray()
             };
         }
 
@@ -339,6 +376,39 @@ public class DetailsModel : PageModel
                 _ => "badge-info"
             };
         }
+
+        private static RecentPollSampleViewModel CreateRecentSampleViewModel(RecentPollSample sample)
+        {
+            return new RecentPollSampleViewModel
+            {
+                CheckedText = FormatDateTime(sample.CheckedUtc),
+                Status = sample.Status,
+                StatusBadgeClass = ToBadgeClass(sample.Status),
+                ResultKind = sample.ResultKind,
+                ResultKindBadgeClass = ToResultKindBadgeClass(sample),
+                DurationText = $"{sample.DurationMs} ms",
+                ErrorSummary = string.IsNullOrWhiteSpace(sample.ErrorSummary) ? "None" : sample.ErrorSummary,
+                HasError = !string.IsNullOrWhiteSpace(sample.ErrorSummary)
+            };
+        }
+
+        private static string ToResultKindBadgeClass(RecentPollSample sample)
+        {
+            if (!string.IsNullOrWhiteSpace(sample.ErrorSummary))
+            {
+                return "badge-danger";
+            }
+
+            return sample.ResultKind switch
+            {
+                "Success" => "badge-success",
+                "Timeout" => "badge-warning",
+                "NetworkError" => "badge-danger",
+                "HttpError" => "badge-danger",
+                "EmptyResponse" => "badge-warning",
+                _ => "badge-secondary"
+            };
+        }
     }
 
     public sealed class HeaderSummaryViewModel
@@ -353,5 +423,24 @@ public class DetailsModel : PageModel
         public required string Name { get; init; }
 
         public required string Value { get; init; }
+    }
+
+    public sealed class RecentPollSampleViewModel
+    {
+        public required string CheckedText { get; init; }
+
+        public required string Status { get; init; }
+
+        public required string StatusBadgeClass { get; init; }
+
+        public required string ResultKind { get; init; }
+
+        public required string ResultKindBadgeClass { get; init; }
+
+        public required string DurationText { get; init; }
+
+        public required string ErrorSummary { get; init; }
+
+        public bool HasError { get; init; }
     }
 }

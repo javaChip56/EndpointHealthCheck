@@ -34,6 +34,16 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
             DurationMs = 123,
             LastError = null,
             IsPolling = true,
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-18T14:59:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 120,
+                    ResultKind = "Success"
+                }
+            ],
             Snapshot = new HealthSnapshot
             {
                 OverallStatus = "Healthy",
@@ -66,6 +76,7 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
 
         Assert.Contains("\"status\":\"Healthy\"", json);
         Assert.Contains("\"endpointId\":\"orders-api\"", json);
+        Assert.Contains("\"recentSamples\":[", json);
         Assert.DoesNotContain("isPolling", json, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -87,6 +98,24 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
             LastSuccessfulUtc = DateTimeOffset.Parse("2026-03-18T15:59:00Z"),
             DurationMs = 456,
             LastError = "Slow dependency",
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-18T15:58:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 430,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-18T16:00:00Z"),
+                    Status = "Degraded",
+                    DurationMs = 456,
+                    ResultKind = "Success",
+                    ErrorSummary = "Slow dependency"
+                }
+            ],
             Snapshot = new HealthSnapshot
             {
                 OverallStatus = "Degraded",
@@ -110,6 +139,8 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         Assert.Equal("Slow dependency", restoredState.LastError);
         Assert.NotNull(restoredState.Snapshot);
         Assert.False(restoredState.IsPolling);
+        Assert.Equal(2, restoredState.RecentSamples.Count);
+        Assert.Equal("Degraded", restoredState.RecentSamples[^1].Status);
     }
 
     [Fact]
@@ -269,7 +300,8 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
             CleanupEnabled = cleanupEnabled,
             CleanupIntervalMinutes = cleanupIntervalMinutes,
             DeleteOrphanedStateFiles = deleteOrphanedStateFiles,
-            OrphanedStateFileRetentionHours = orphanedRetentionHours
+            OrphanedStateFileRetentionHours = orphanedRetentionHours,
+            RecentSampleLimit = 25
         };
     }
 

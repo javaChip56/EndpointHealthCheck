@@ -40,6 +40,7 @@ public sealed class PollingSchedulerReloadTests
             stateStore,
             new NoOpEndpointPoller(),
             new NoOpHealthResponseParser(),
+            new RuntimeStateOptions(),
             TimeProvider.System,
             NullLogger<PollingSchedulerService>.Instance);
 
