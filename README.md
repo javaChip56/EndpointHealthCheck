@@ -482,6 +482,11 @@ Test file:
 ## Future Plans
 
 These are planned enhancements after the current v1 path:
+- optionally add short status history and mini trends so the dashboard can show recent health changes instead of only the latest snapshot
+- optionally persist runtime state to compact per-endpoint files while keeping the active runtime cache in memory
+- store persisted endpoint state outside the YAML config area so runtime data stays separate from configuration hot-reload inputs
+- add configurable retention controls for persisted runtime data, including cleanup of old history files and orphaned endpoint state files
+- make runtime data cleanup best-effort and time-based, such as deleting eligible files older than a configured number of hours
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API
 
 ## Notes For Ongoing Updates
