@@ -28,7 +28,11 @@ public class IndexModel : PageModel
 
     public IReadOnlyList<EndpointSummaryViewModel> Endpoints { get; private set; } = [];
 
+    public IReadOnlyList<EndpointSummaryViewModel> ProblemEndpoints { get; private set; } = [];
+
     public DashboardCountersViewModel Counters { get; private set; } = new();
+
+    public bool HasConfiguredEndpoints => Endpoints.Count > 0;
 
     public void OnGet()
     {
@@ -84,11 +88,20 @@ public class IndexModel : PageModel
         Counters = new DashboardCountersViewModel
         {
             Total = Endpoints.Count,
+            Enabled = Endpoints.Count(static endpoint => endpoint.Enabled),
+            Disabled = Endpoints.Count(static endpoint => !endpoint.Enabled),
+            Polling = Endpoints.Count(static endpoint => endpoint.IsPolling),
             Healthy = Endpoints.Count(static endpoint => endpoint.Status == "Healthy"),
             Degraded = Endpoints.Count(static endpoint => endpoint.Status == "Degraded"),
             Unhealthy = Endpoints.Count(static endpoint => endpoint.Status == "Unhealthy"),
             Unknown = Endpoints.Count(static endpoint => endpoint.Status is not ("Healthy" or "Degraded" or "Unhealthy"))
         };
+
+        ProblemEndpoints = Endpoints
+            .Where(static endpoint => !string.IsNullOrWhiteSpace(endpoint.ErrorText) ||
+                                      endpoint.Status is "Degraded" or "Unhealthy")
+            .OrderBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         _logger.LogDebug("Loaded dashboard with {EndpointCount} endpoint summaries.", Endpoints.Count);
     }
@@ -96,6 +109,12 @@ public class IndexModel : PageModel
     public sealed class DashboardCountersViewModel
     {
         public int Total { get; init; }
+
+        public int Enabled { get; init; }
+
+        public int Disabled { get; init; }
+
+        public int Polling { get; init; }
 
         public int Healthy { get; init; }
 
@@ -129,6 +148,14 @@ public class IndexModel : PageModel
         public string DurationText { get; init; } = "-";
 
         public string? ErrorText { get; init; }
+
+        public string ErrorSummary => string.IsNullOrWhiteSpace(ErrorText) ? "None" : ErrorText;
+
+        public string StatusDescription => !Enabled
+            ? "Disabled"
+            : IsPolling
+                ? "Polling"
+                : Status;
 
         public static EndpointSummaryViewModel From(EndpointConfig endpoint, EndpointState? state)
         {

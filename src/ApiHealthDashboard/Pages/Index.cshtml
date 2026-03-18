@@ -37,11 +37,11 @@
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-lg-8">
-                        <span class="hero-kicker">Phase 8 Manual Refresh</span>
-                        <h2 class="hero-title">Live endpoint inventory backed by scheduler state</h2>
+                        <span class="hero-kicker">Phase 9 Summary View</span>
+                        <h2 class="hero-title">Operational overview of monitored endpoint health</h2>
                         <p class="hero-copy mb-0">
-                            The dashboard now reads configured endpoints and current runtime state from the in-memory store.
-                            Manual refresh actions reuse the scheduler so they do not interfere with in-progress polling.
+                            This dashboard summarizes the live runtime state for configured endpoints, including the latest status,
+                            check timings, current failures, and safe refresh actions backed by the scheduler.
                         </p>
                     </div>
                     <div class="col-lg-4">
@@ -51,12 +51,12 @@
                                 <strong>@Model.Counters.Total</strong>
                             </div>
                             <div class="hero-stat">
-                                <span class="hero-stat-label">Scheduler mode</span>
-                                <strong>Background loops active</strong>
+                                <span class="hero-stat-label">Enabled / disabled</span>
+                                <strong>@Model.Counters.Enabled / @Model.Counters.Disabled</strong>
                             </div>
                             <div class="hero-stat mb-0">
-                                <span class="hero-stat-label">Refresh path</span>
-                                <strong>Manual + scheduled</strong>
+                                <span class="hero-stat-label">Polling now</span>
+                                <strong>@Model.Counters.Polling</strong>
                             </div>
                         </div>
                     </div>
@@ -101,8 +101,8 @@
             <div class="col-lg-3 col-6">
                 <div class="small-box health-box bg-danger">
                     <div class="inner">
-                        <h3>@(Model.Counters.Unhealthy + Model.Counters.Unknown)</h3>
-                        <p>Unhealthy or Unknown</p>
+                        <h3>@Model.Counters.Unhealthy</h3>
+                        <p>Unhealthy Endpoints</p>
                     </div>
                     <div class="icon">
                         <i class="fas fa-radiation"></i>
@@ -115,7 +115,7 @@
             <div class="col-lg-8">
                 <div class="card">
                     <div class="card-header border-0">
-                        <h3 class="card-title">Monitored Endpoints</h3>
+                        <h3 class="card-title">Endpoint Summary</h3>
                         <div class="card-tools">
                             <form method="post" asp-page-handler="RefreshAll" class="d-inline">
                                 <button type="submit" class="btn btn-tool">
@@ -125,27 +125,34 @@
                         </div>
                     </div>
                     <div class="card-body table-responsive p-0">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Status</th>
-                                    <th>Last Checked</th>
-                                    <th>Last Successful</th>
-                                    <th>Duration</th>
-                                    <th>Frequency</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @if (Model.Endpoints.Count == 0)
-                                {
+                        @if (!Model.HasConfiguredEndpoints)
+                        {
+                            <div class="dashboard-empty-state">
+                                <div class="empty-state-icon">
+                                    <i class="fas fa-stethoscope"></i>
+                                </div>
+                                <h3>No endpoints configured yet</h3>
+                                <p class="text-muted mb-0">
+                                    Add one or more endpoints to <code>endpoints.yaml</code> and restart the app to begin monitoring.
+                                </p>
+                            </div>
+                        }
+                        else
+                        {
+                            <table class="table table-hover dashboard-table">
+                                <thead>
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-4">No endpoints are configured.</td>
+                                        <th>Name</th>
+                                        <th>Status</th>
+                                        <th>Last Checked</th>
+                                        <th>Last Successful</th>
+                                        <th>Duration</th>
+                                        <th>Frequency</th>
+                                        <th>Error</th>
+                                        <th>Actions</th>
                                     </tr>
-                                }
-                                else
-                                {
+                                </thead>
+                                <tbody>
                                     @foreach (var endpoint in Model.Endpoints)
                                     {
                                         <tr>
@@ -154,28 +161,31 @@
                                                 <small class="text-muted">@endpoint.Id</small>
                                                 @if (!endpoint.Enabled)
                                                 {
-                                                    <div><small class="text-muted">Disabled</small></div>
-                                                }
-                                                @if (!string.IsNullOrWhiteSpace(endpoint.ErrorText))
-                                                {
-                                                    <div><small class="text-danger">@endpoint.ErrorText</small></div>
+                                                    <div><small class="text-muted">Disabled in YAML</small></div>
                                                 }
                                             </td>
                                             <td>
                                                 <span class="badge @endpoint.StatusBadgeClass">@endpoint.Status</span>
-                                                @if (endpoint.IsPolling)
-                                                {
-                                                    <div><small class="text-info">Polling now</small></div>
-                                                }
+                                                <div><small class="text-muted">@endpoint.StatusDescription</small></div>
                                             </td>
                                             <td>@endpoint.LastCheckedText</td>
                                             <td>@endpoint.LastSuccessfulText</td>
                                             <td>@endpoint.DurationText</td>
                                             <td>@endpoint.FrequencyText</td>
+                                            <td class="dashboard-error-cell">
+                                                @if (string.IsNullOrWhiteSpace(endpoint.ErrorText))
+                                                {
+                                                    <span class="text-muted">None</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-danger">@endpoint.ErrorSummary</span>
+                                                }
+                                            </td>
                                             <td class="text-nowrap">
                                                 <form method="post" asp-page-handler="RefreshEndpoint" class="d-inline">
                                                     <input type="hidden" name="endpointId" value="@endpoint.Id" />
-                                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Refresh endpoint">
                                                         <i class="fas fa-sync-alt"></i>
                                                     </button>
                                                 </form>
@@ -183,16 +193,17 @@
                                             </td>
                                         </tr>
                                     }
-                                }
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        }
                     </div>
                 </div>
             </div>
+
             <div class="col-lg-4">
                 <div class="card card-outline card-primary">
                     <div class="card-header">
-                        <h3 class="card-title">Scheduler Snapshot</h3>
+                        <h3 class="card-title">Health Distribution</h3>
                     </div>
                     <div class="card-body">
                         <div class="progress-group">
@@ -228,23 +239,32 @@
 
                 <div class="card">
                     <div class="card-header">
-                        <h3 class="card-title">Current Signals</h3>
+                        <h3 class="card-title">Active Issues</h3>
                     </div>
                     <div class="card-body p-0">
-                        <ul class="todo-list endpoint-notes" data-widget="todo-list">
-                            <li>
-                                <span class="text">Manual refresh buttons reuse the scheduler interface.</span>
-                            </li>
-                            <li>
-                                <span class="text">Overlap protection keeps one endpoint from being double-polled.</span>
-                            </li>
-                            <li>
-                                <span class="text">Status, duration, and error state come from the runtime store.</span>
-                            </li>
-                            <li>
-                                <span class="text">Details page now reflects real endpoint metadata and current snapshot data.</span>
-                            </li>
-                        </ul>
+                        @if (Model.ProblemEndpoints.Count == 0)
+                        {
+                            <div class="p-3 text-muted">No degraded, unhealthy, or erroring endpoints are currently visible.</div>
+                        }
+                        else
+                        {
+                            <ul class="todo-list endpoint-notes" data-widget="todo-list">
+                                @foreach (var endpoint in Model.ProblemEndpoints)
+                                {
+                                    <li>
+                                        <span class="text">
+                                            <strong>@endpoint.Name</strong>
+                                            <span class="badge @endpoint.StatusBadgeClass ml-2">@endpoint.Status</span>
+                                        </span>
+                                        <div class="text-muted small mt-1">Last checked: @endpoint.LastCheckedText</div>
+                                        @if (!string.IsNullOrWhiteSpace(endpoint.ErrorText))
+                                        {
+                                            <div class="text-danger small mt-1">@endpoint.ErrorSummary</div>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
                     </div>
                 </div>
             </div>

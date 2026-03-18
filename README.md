@@ -21,9 +21,9 @@ Implemented so far:
 - Phase 6: health response parser and tests
 - Phase 7: background polling scheduler and tests
 - Phase 8: manual refresh actions and page-model tests
+- Phase 9: dashboard summary view and tests
 
 Not implemented yet:
-- real dashboard data binding
 - CI/CD workflows
 
 ## Solution Layout
@@ -62,8 +62,8 @@ Not implemented yet:
 The app uses locally bundled AdminLTE assets under [`src/ApiHealthDashboard/wwwroot/adminlte`](src/ApiHealthDashboard/wwwroot/adminlte).
 
 Current UI pages:
-- dashboard placeholder: [`src/ApiHealthDashboard/Pages/Index.cshtml`](src/ApiHealthDashboard/Pages/Index.cshtml)
-- endpoint details placeholder: [`src/ApiHealthDashboard/Pages/Endpoints/Details.cshtml`](src/ApiHealthDashboard/Pages/Endpoints/Details.cshtml)
+- dashboard summary page: [`src/ApiHealthDashboard/Pages/Index.cshtml`](src/ApiHealthDashboard/Pages/Index.cshtml)
+- endpoint details page: [`src/ApiHealthDashboard/Pages/Endpoints/Details.cshtml`](src/ApiHealthDashboard/Pages/Endpoints/Details.cshtml)
 
 ### YAML Configuration
 
@@ -166,6 +166,17 @@ Current manual refresh behavior:
 - user feedback is shown through page status messages after each action
 - dashboard and details pages now read live configured endpoints and current runtime state instead of hard-coded placeholder rows
 
+### Dashboard Summary
+
+The dashboard home page now acts as an operational summary instead of a transitional placeholder.
+
+Current dashboard behavior:
+- shows configured, enabled, disabled, and actively polling endpoint counts
+- highlights healthy, degraded, unhealthy, and unknown totals in summary cards
+- renders a live endpoint table with last check, duration, error summary, and manual refresh actions
+- surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
+- shows a clearer empty state when no endpoints are configured
+
 ## Running The App
 
 From the repository root:
@@ -215,6 +226,8 @@ Current automated coverage includes:
 - scheduler state update handling
 - scheduler overlap prevention
 - scheduler independent polling for enabled endpoints only
+- dashboard page-model mixed counter and problem-endpoint calculation
+- dashboard page-model empty dashboard state handling
 - dashboard page-model refresh-all behavior
 - dashboard page-model refresh-single behavior
 - endpoint details page-model refresh behavior
@@ -247,7 +260,7 @@ Test file:
 - [x] Phase 6 - Health response parser
 - [x] Phase 7 - Polling scheduler
 - [x] Phase 8 - Manual refresh actions
-- [ ] Phase 9 - Dashboard summary page
+- [x] Phase 9 - Dashboard summary page
 - [ ] Phase 10 - Endpoint details page
 - [ ] Phase 11 - Error handling and logging
 - [ ] Phase 12 - Automated tests expansion

@@ -61,6 +61,57 @@ public sealed class IndexModelTests
         Assert.Equal(2, model.Counters.Total);
     }
 
+    [Fact]
+    public void OnGet_CalculatesMixedStatusCountersAndProblemEndpoints()
+    {
+        var config = CreateConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+
+        store.Upsert(new ApiHealthDashboard.Domain.EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Healthy"
+        });
+
+        store.Upsert(new ApiHealthDashboard.Domain.EndpointState
+        {
+            EndpointId = "billing-api",
+            EndpointName = "Billing API",
+            Status = "Degraded",
+            LastError = "Dependency timeout"
+        });
+
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        Assert.Equal(2, model.Counters.Total);
+        Assert.Equal(2, model.Counters.Enabled);
+        Assert.Equal(0, model.Counters.Disabled);
+        Assert.Equal(1, model.Counters.Healthy);
+        Assert.Equal(1, model.Counters.Degraded);
+        Assert.Equal(0, model.Counters.Unhealthy);
+        Assert.Equal(0, model.Counters.Unknown);
+        Assert.Single(model.ProblemEndpoints);
+        Assert.Equal("billing-api", model.ProblemEndpoints[0].Id);
+    }
+
+    [Fact]
+    public void OnGet_WithNoConfiguredEndpoints_ExposesEmptyDashboardState()
+    {
+        var config = new DashboardConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        Assert.False(model.HasConfiguredEndpoints);
+        Assert.Empty(model.Endpoints);
+        Assert.Empty(model.ProblemEndpoints);
+        Assert.Equal(0, model.Counters.Total);
+    }
+
     private static DashboardConfig CreateConfig()
     {
         return new DashboardConfig
