@@ -49,6 +49,23 @@ public sealed class IndexModelTests
     }
 
     [Fact]
+    public async Task OnPostRefreshEndpointAsync_WithoutEndpointId_SetsWarning()
+    {
+        var config = CreateConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance)
+        {
+            TempData = PageModelTestHelpers.CreateTempData()
+        };
+
+        var result = await model.OnPostRefreshEndpointAsync(string.Empty, CancellationToken.None);
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("No endpoint was selected for refresh.", model.TempData["StatusMessage"]);
+        Assert.Equal("warning", model.TempData["StatusType"]);
+    }
+
+    [Fact]
     public void OnGet_LoadsConfiguredEndpointSummaries()
     {
         var config = CreateConfig();
@@ -110,6 +127,29 @@ public sealed class IndexModelTests
         Assert.Empty(model.Endpoints);
         Assert.Empty(model.ProblemEndpoints);
         Assert.Equal(0, model.Counters.Total);
+    }
+
+    [Fact]
+    public void OnGet_CountsDisabledAndUnknownEndpoints()
+    {
+        var config = CreateConfig();
+        config.Endpoints[1].Enabled = false;
+
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        store.Upsert(new ApiHealthDashboard.Domain.EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Healthy"
+        });
+
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        Assert.Equal(1, model.Counters.Enabled);
+        Assert.Equal(1, model.Counters.Disabled);
+        Assert.Equal(1, model.Counters.Unknown);
     }
 
     private static DashboardConfig CreateConfig()

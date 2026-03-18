@@ -201,6 +201,100 @@ public sealed class PollingSchedulerServiceTests
         }
     }
 
+    [Fact]
+    public async Task RefreshAllEnabledAsync_ReturnsStartedRefreshCountForEnabledEndpointsOnly()
+    {
+        var orders = new EndpointConfig
+        {
+            Id = "orders-api",
+            Name = "Orders API",
+            Url = "https://orders.example.com/health",
+            Enabled = true,
+            FrequencySeconds = 30
+        };
+
+        var billing = new EndpointConfig
+        {
+            Id = "billing-api",
+            Name = "Billing API",
+            Url = "https://billing.example.com/health",
+            Enabled = false,
+            FrequencySeconds = 30
+        };
+
+        var startedEndpointIds = new List<string>();
+
+        var scheduler = CreateScheduler(
+            new DashboardConfig { Endpoints = [orders, billing] },
+            new InMemoryEndpointStateStore([orders, billing]),
+            new DelegateEndpointPoller((endpoint, _) =>
+            {
+                startedEndpointIds.Add(endpoint.Id);
+                return Task.FromResult(new PollResult
+                {
+                    Kind = PollResultKind.Success,
+                    CheckedUtc = DateTimeOffset.UtcNow,
+                    DurationMs = 5,
+                    ResponseBody = """{"status":"Healthy"}"""
+                });
+            }),
+            new DelegateHealthResponseParser((_, _, durationMs) => new HealthSnapshot
+            {
+                OverallStatus = "Healthy",
+                RetrievedUtc = DateTimeOffset.UtcNow,
+                DurationMs = durationMs
+            }));
+
+        var refreshedCount = await scheduler.RefreshAllEnabledAsync();
+
+        Assert.Equal(1, refreshedCount);
+        Assert.Equal(["orders-api"], startedEndpointIds);
+    }
+
+    [Fact]
+    public async Task RefreshEndpointAsync_WhenParserReturnsErrorSnapshot_PersistsLastError()
+    {
+        var endpoint = new EndpointConfig
+        {
+            Id = "orders-api",
+            Name = "Orders API",
+            Url = "https://orders.example.com/health",
+            Enabled = true,
+            FrequencySeconds = 30
+        };
+
+        var store = new InMemoryEndpointStateStore([endpoint]);
+        var scheduler = CreateScheduler(
+            new DashboardConfig { Endpoints = [endpoint] },
+            store,
+            new DelegateEndpointPoller((_, _) => Task.FromResult(new PollResult
+            {
+                Kind = PollResultKind.Success,
+                CheckedUtc = DateTimeOffset.UtcNow,
+                DurationMs = 55,
+                ResponseBody = """{"status":"Healthy"}"""
+            })),
+            new DelegateHealthResponseParser((_, _, durationMs) => new HealthSnapshot
+            {
+                OverallStatus = "Unknown",
+                RetrievedUtc = DateTimeOffset.UtcNow,
+                DurationMs = durationMs,
+                Metadata = new Dictionary<string, object?>
+                {
+                    ["parserError"] = "Malformed nested payload"
+                }
+            }));
+
+        var refreshed = await scheduler.RefreshEndpointAsync("orders-api");
+        var state = store.Get("orders-api");
+
+        Assert.True(refreshed);
+        Assert.NotNull(state);
+        Assert.Equal("Unknown", state!.Status);
+        Assert.Equal("Failed to parse health response: Malformed nested payload", state.LastError);
+        Assert.NotNull(state.Snapshot);
+    }
+
     private static PollingSchedulerService CreateScheduler(
         DashboardConfig config,
         IEndpointStateStore stateStore,

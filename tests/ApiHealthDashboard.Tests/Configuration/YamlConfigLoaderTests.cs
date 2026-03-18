@@ -164,6 +164,33 @@ public sealed class YamlConfigLoaderTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Load_WithMissingFile_ThrowsHelpfulError()
+    {
+        var missingPath = Path.Combine(_tempDirectory, "missing.yaml");
+
+        var exception = Assert.Throws<DashboardConfigurationException>(() => _loader.Load(missingPath));
+
+        Assert.Contains("was not found", exception.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_WithMalformedYaml_ThrowsHelpfulParseError()
+    {
+        var configPath = WriteConfig(
+            """
+            endpoints:
+              - id: broken-api
+                name: Broken API
+                url: https://broken.example.com/health
+                headers: [invalid
+            """);
+
+        var exception = Assert.Throws<DashboardConfigurationException>(() => _loader.Load(configPath));
+
+        Assert.Contains("Failed to parse YAML", exception.Errors.Single(), StringComparison.Ordinal);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

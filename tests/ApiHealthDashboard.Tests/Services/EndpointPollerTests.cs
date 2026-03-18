@@ -161,6 +161,51 @@ public sealed class EndpointPollerTests
         Assert.Contains("empty response body", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task PollAsync_WithUnexpectedFailure_ReturnsUnknownErrorResult()
+    {
+        var handler = new StubHttpMessageHandler(
+            (_, _) => throw new InvalidOperationException("Unexpected failure"));
+
+        var poller = CreatePoller(handler);
+
+        var result = await poller.PollAsync(
+            new EndpointConfig
+            {
+                Id = "unexpected-api",
+                Name = "Unexpected API",
+                Url = "https://unexpected.example.com/health"
+            },
+            CancellationToken.None);
+
+        Assert.Equal(PollResultKind.UnknownError, result.Kind);
+        Assert.Contains("Unexpected failure", result.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PollAsync_WithCallerCancellation_PropagatesCancellation()
+    {
+        var handler = new StubHttpMessageHandler(
+            async (_, cancellationToken) =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            });
+
+        var poller = CreatePoller(handler);
+        using var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => poller.PollAsync(
+            new EndpointConfig
+            {
+                Id = "canceled-api",
+                Name = "Canceled API",
+                Url = "https://canceled.example.com/health"
+            },
+            cancellationTokenSource.Token));
+    }
+
     private static EndpointPoller CreatePoller(
         HttpMessageHandler handler,
         DashboardConfig? dashboardConfig = null)

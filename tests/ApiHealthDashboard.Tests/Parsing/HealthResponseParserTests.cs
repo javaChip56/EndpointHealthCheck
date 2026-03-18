@@ -221,6 +221,67 @@ public sealed class HealthResponseParserTests
         Assert.NotNull(warning.Exception);
     }
 
+    [Fact]
+    public void Parse_WithExtraUnknownFields_PreservesRootAndNodeMetadata()
+    {
+        var snapshot = CreateParser().Parse(
+            CreateEndpoint("orders-api"),
+            """
+            {
+              "status": "Healthy",
+              "region": "apac",
+              "entries": {
+                "database": {
+                  "status": "Healthy",
+                  "replicaLagMs": 12,
+                  "data": {
+                    "provider": "sql"
+                  }
+                }
+              }
+            }
+            """,
+            12);
+
+        Assert.Equal("apac", snapshot.Metadata["region"]);
+
+        var database = Assert.Single(snapshot.Nodes);
+        Assert.Equal(12L, database.Data["replicaLagMs"]);
+        Assert.Equal("sql", database.Data["provider"]);
+    }
+
+    [Fact]
+    public void Parse_WithExcludeFilter_RemovesMatchingNodesRecursively()
+    {
+        var endpoint = CreateEndpoint("inventory-api");
+        endpoint.ExcludeChecks = ["reporting"];
+
+        var snapshot = CreateParser().Parse(
+            endpoint,
+            """
+            {
+              "entries": {
+                "dependencies": {
+                  "children": {
+                    "cache": {
+                      "status": "Healthy"
+                    },
+                    "reporting": {
+                      "status": "Unhealthy"
+                    }
+                  }
+                }
+              }
+            }
+            """,
+            25);
+
+        var dependencies = Assert.Single(snapshot.Nodes);
+        Assert.Equal("dependencies", dependencies.Name);
+        var cache = Assert.Single(dependencies.Children);
+        Assert.Equal("cache", cache.Name);
+    }
+
     private static EndpointConfig CreateEndpoint(string id)
     {
         return new EndpointConfig

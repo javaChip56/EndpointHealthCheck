@@ -24,6 +24,7 @@ Implemented so far:
 - Phase 9: dashboard summary view and tests
 - Phase 10: endpoint details diagnostics view and tests
 - Phase 11: error handling and structured logging improvements
+- Phase 12: automated test expansion for invalid and edge-case coverage
 
 Not implemented yet:
 - CI/CD workflows
@@ -202,6 +203,18 @@ Current logging behavior:
 - logs poll start and completion with trigger source, duration, result kind, and HTTP status code when available
 - logs timeout, network, HTTP, parser, and scheduler-loop failure conditions without exposing secret header values
 
+### Automated Test Coverage
+
+The test suite now covers both core happy paths and a wider set of invalid and operational edge cases.
+
+Recent test expansion includes:
+- isolated dashboard configuration validator tests
+- YAML loader missing-file and malformed-YAML cases
+- parser coverage for unknown-field preservation and recursive exclusion filtering
+- poller coverage for unexpected failures and caller-driven cancellation
+- scheduler coverage for parser-error snapshots and refresh-all enabled-endpoint counting
+- page-model coverage for default details routing and missing endpoint-id refresh actions
+
 ## Running The App
 
 From the repository root:
@@ -230,8 +243,11 @@ dotnet test .\ApiHealthDashboard.sln -c Release
 Current automated coverage includes:
 - valid YAML load
 - normalization of null optional collections
+- missing configuration file handling
+- malformed YAML handling
 - duplicate endpoint id validation
 - invalid value aggregation
+- isolated validator success and invalid-case checks
 - environment variable substitution
 - runtime state initialization
 - runtime state upsert and deep-copy safety
@@ -249,19 +265,27 @@ Current automated coverage includes:
 - parser recursive filtering behavior
 - parser malformed JSON handling
 - parser malformed JSON warning logging
+- parser extra metadata preservation
+- parser recursive exclusion filtering
 - scheduler state update handling
 - scheduler overlap prevention
 - scheduler independent polling for enabled endpoints only
+- scheduler refresh-all enabled-count behavior
+- scheduler parser-error snapshot persistence
 - dashboard page-model mixed counter and problem-endpoint calculation
 - dashboard page-model empty dashboard state handling
+- dashboard page-model missing endpoint-id refresh handling
 - dashboard page-model refresh-all behavior
 - dashboard page-model refresh-single behavior
+- endpoint details page-model default endpoint resolution
+- endpoint details page-model no-endpoint refresh handling
 - endpoint details page-model diagnostic summary loading
 - endpoint details raw-payload visibility rules
 - endpoint details page-model refresh behavior
 - endpoint details not-found behavior
 
 Test file:
+- [`tests/ApiHealthDashboard.Tests/Configuration/DashboardConfigValidatorTests.cs`](tests/ApiHealthDashboard.Tests/Configuration/DashboardConfigValidatorTests.cs)
 - [`tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs`](tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs)
 - [`tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs`](tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs)
 - [`tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs`](tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs)
@@ -291,7 +315,7 @@ Test file:
 - [x] Phase 9 - Dashboard summary page
 - [x] Phase 10 - Endpoint details page
 - [x] Phase 11 - Error handling and logging
-- [ ] Phase 12 - Automated tests expansion
+- [x] Phase 12 - Automated tests expansion
 - [ ] Phase 13 - Publish and deployment validation
 - [ ] Phase 14 - GitHub Actions CI/CD
 

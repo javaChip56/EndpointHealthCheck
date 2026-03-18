@@ -56,6 +56,28 @@ public sealed class DetailsModelTests
     }
 
     [Fact]
+    public void OnGet_WithoutRouteId_LoadsFirstConfiguredEndpoint()
+    {
+        var config = CreateConfig();
+        config.Endpoints.Add(new EndpointConfig
+        {
+            Id = "billing-api",
+            Name = "Billing API",
+            Url = "https://billing.example.com/health",
+            FrequencySeconds = 60
+        });
+
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        var model = new DetailsModel(config, store, new StubEndpointScheduler(), NullLogger<DetailsModel>.Instance);
+
+        var result = model.OnGet(null);
+
+        Assert.IsType<PageResult>(result);
+        Assert.NotNull(model.Endpoint);
+        Assert.Equal("orders-api", model.Endpoint!.Id);
+    }
+
+    [Fact]
     public void OnGet_WithSnapshot_LoadsDetailedDiagnostics()
     {
         var config = CreateConfig(showRawPayload: true);
@@ -153,6 +175,21 @@ public sealed class DetailsModelTests
         Assert.NotNull(model.Endpoint);
         Assert.False(model.Endpoint!.ShowRawPayload);
         Assert.Null(model.Endpoint.RawPayload);
+    }
+
+    [Fact]
+    public async Task OnPostRefreshAsync_WithoutAnyConfiguredEndpoint_ReturnsNotFound()
+    {
+        var config = new DashboardConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        var model = new DetailsModel(config, store, new StubEndpointScheduler(), NullLogger<DetailsModel>.Instance)
+        {
+            TempData = PageModelTestHelpers.CreateTempData()
+        };
+
+        var result = await model.OnPostRefreshAsync(null, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
     }
 
     private static DashboardConfig CreateConfig(bool showRawPayload = false)
