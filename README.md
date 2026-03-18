@@ -17,9 +17,9 @@ Implemented so far:
 - Phase 2: local AdminLTE layout and placeholder pages
 - Phase 3: YAML configuration models, loader, validation, and tests
 - Phase 4: in-memory runtime state store and tests
+- Phase 5: HTTP endpoint poller and tests
 
 Not implemented yet:
-- endpoint polling
 - health response parsing
 - scheduler
 - manual refresh actions
@@ -104,6 +104,24 @@ Current behavior:
 - returns deep copies so callers cannot mutate internal store state accidentally
 - uses thread-safe locking for concurrent access
 
+### HTTP Poller
+
+The app now includes an `HttpClientFactory`-based endpoint poller for individual health endpoint requests.
+
+Poller components:
+- [`src/ApiHealthDashboard/Services/IEndpointPoller.cs`](src/ApiHealthDashboard/Services/IEndpointPoller.cs)
+- [`src/ApiHealthDashboard/Services/EndpointPoller.cs`](src/ApiHealthDashboard/Services/EndpointPoller.cs)
+- [`src/ApiHealthDashboard/Services/PollResult.cs`](src/ApiHealthDashboard/Services/PollResult.cs)
+- [`src/ApiHealthDashboard/Services/PollResultKind.cs`](src/ApiHealthDashboard/Services/PollResultKind.cs)
+
+Current behavior:
+- performs async HTTP GET requests for configured endpoints
+- uses per-endpoint timeout with fallback to the dashboard default timeout
+- applies configured request headers
+- captures check time, duration, HTTP status, response body, and error message
+- distinguishes success, timeout, network failure, HTTP failure, empty response, and unknown failure
+- avoids logging secret header values
+
 ## Running The App
 
 From the repository root:
@@ -139,10 +157,17 @@ Current automated coverage includes:
 - runtime state upsert and deep-copy safety
 - runtime state reinitialization
 - runtime state concurrent update behavior
+- poller success handling
+- poller timeout handling
+- poller network failure handling
+- poller non-success HTTP status handling
+- poller empty-response handling
+- poller request header application
 
 Test file:
 - [`tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs`](tests/ApiHealthDashboard.Tests/Configuration/YamlConfigLoaderTests.cs)
 - [`tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs`](tests/ApiHealthDashboard.Tests/State/InMemoryEndpointStateStoreTests.cs)
+- [`tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs`](tests/ApiHealthDashboard.Tests/Services/EndpointPollerTests.cs)
 
 ## Important Constraints
 
@@ -158,7 +183,7 @@ Test file:
 - [x] Phase 2 - Local AdminLTE integration
 - [x] Phase 3 - YAML configuration loader
 - [x] Phase 4 - Runtime state store
-- [ ] Phase 5 - HTTP poller
+- [x] Phase 5 - HTTP poller
 - [ ] Phase 6 - Health response parser
 - [ ] Phase 7 - Polling scheduler
 - [ ] Phase 8 - Manual refresh actions
