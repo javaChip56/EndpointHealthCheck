@@ -8,6 +8,14 @@ public sealed class RuntimeStateOptions
 
     public string DirectoryPath { get; set; } = "runtime-state/endpoints";
 
+    public bool CleanupEnabled { get; set; } = true;
+
+    public double CleanupIntervalMinutes { get; set; } = 30;
+
+    public bool DeleteOrphanedStateFiles { get; set; } = true;
+
+    public double OrphanedStateFileRetentionHours { get; set; } = 5;
+
     public string ResolveDirectoryPath(string contentRootPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contentRootPath);
@@ -19,5 +27,19 @@ public sealed class RuntimeStateOptions
         return Path.IsPathRooted(configuredPath)
             ? Path.GetFullPath(configuredPath)
             : Path.GetFullPath(Path.Combine(contentRootPath, configuredPath));
+    }
+
+    public TimeSpan GetCleanupInterval()
+    {
+        return CleanupIntervalMinutes <= 0
+            ? TimeSpan.Zero
+            : TimeSpan.FromMinutes(CleanupIntervalMinutes);
+    }
+
+    public TimeSpan GetOrphanedStateFileRetention()
+    {
+        return OrphanedStateFileRetentionHours <= 0
+            ? TimeSpan.Zero
+            : TimeSpan.FromHours(OrphanedStateFileRetentionHours);
     }
 }

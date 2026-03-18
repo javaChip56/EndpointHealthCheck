@@ -20,24 +20,37 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
 
     private readonly InMemoryEndpointStateStore _innerStore;
     private readonly ConcurrentDictionary<string, object> _fileLocks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _cleanupSyncRoot = new();
     private readonly object _initializeSyncRoot = new();
     private readonly ILogger<FileBackedEndpointStateStore> _logger;
+    private readonly RuntimeStateOptions _options;
     private readonly string _stateDirectoryPath;
+    private DateTimeOffset _nextCleanupUtc = DateTimeOffset.MinValue;
+    private HashSet<string> _configuredStateFilePaths = new(StringComparer.OrdinalIgnoreCase);
 
     public FileBackedEndpointStateStore(
         IEnumerable<EndpointConfig> endpoints,
         string stateDirectoryPath,
+        RuntimeStateOptions options,
         ILogger<FileBackedEndpointStateStore> logger)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentException.ThrowIfNullOrWhiteSpace(stateDirectoryPath);
+        ArgumentNullException.ThrowIfNull(options);
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _options = options;
         _stateDirectoryPath = Path.GetFullPath(stateDirectoryPath);
-        _innerStore = new InMemoryEndpointStateStore(endpoints);
+        var endpointList = endpoints
+            .Where(static endpoint => endpoint is not null)
+            .Select(static endpoint => endpoint.Clone())
+            .ToArray();
+        _innerStore = new InMemoryEndpointStateStore(endpointList);
 
         Directory.CreateDirectory(_stateDirectoryPath);
-        RestorePersistedStates(endpoints, restoreWhenStateIsInitial: true);
+        UpdateConfiguredStateFilePaths(endpointList);
+        RestorePersistedStates(endpointList, restoreWhenStateIsInitial: true);
+        TryCleanupPersistedFiles(force: true);
     }
 
     public IReadOnlyCollection<EndpointState> GetAll()
@@ -56,6 +69,7 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
 
         _innerStore.Upsert(state);
         PersistState(state);
+        TryCleanupPersistedFiles(force: false);
     }
 
     public void Initialize(IEnumerable<EndpointConfig> endpoints)
@@ -70,7 +84,9 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
         lock (_initializeSyncRoot)
         {
             _innerStore.Initialize(endpointList);
+            UpdateConfiguredStateFilePaths(endpointList);
             RestorePersistedStates(endpointList, restoreWhenStateIsInitial: true);
+            TryCleanupPersistedFiles(force: true);
         }
     }
 
@@ -165,6 +181,107 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
             {
                 TryDeleteTempFile(tempFilePath);
                 throw;
+            }
+        }
+    }
+
+    private void UpdateConfiguredStateFilePaths(IEnumerable<EndpointConfig> endpoints)
+    {
+        var configuredPaths = endpoints
+            .Where(static endpoint => endpoint is not null && !string.IsNullOrWhiteSpace(endpoint.Id))
+            .Select(endpoint => Path.GetFullPath(GetStateFilePath(endpoint.Id)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        lock (_cleanupSyncRoot)
+        {
+            _configuredStateFilePaths = configuredPaths;
+        }
+    }
+
+    private void TryCleanupPersistedFiles(bool force)
+    {
+        if (!_options.CleanupEnabled || !Directory.Exists(_stateDirectoryPath))
+        {
+            return;
+        }
+
+        HashSet<string> configuredPaths;
+        var now = DateTimeOffset.UtcNow;
+        var cleanupInterval = _options.GetCleanupInterval();
+
+        lock (_cleanupSyncRoot)
+        {
+            if (!force &&
+                cleanupInterval > TimeSpan.Zero &&
+                now < _nextCleanupUtc)
+            {
+                return;
+            }
+
+            _nextCleanupUtc = cleanupInterval > TimeSpan.Zero
+                ? now.Add(cleanupInterval)
+                : now;
+
+            configuredPaths = new HashSet<string>(_configuredStateFilePaths, StringComparer.OrdinalIgnoreCase);
+        }
+
+        CleanupOrphanedStateFiles(configuredPaths, now);
+    }
+
+    private void CleanupOrphanedStateFiles(
+        HashSet<string> configuredPaths,
+        DateTimeOffset now)
+    {
+        if (!_options.DeleteOrphanedStateFiles)
+        {
+            return;
+        }
+
+        var retention = _options.GetOrphanedStateFileRetention();
+        var cutoffUtc = now.UtcDateTime - retention;
+
+        foreach (var stateFilePath in Directory.EnumerateFiles(_stateDirectoryPath, "*.state.json", SearchOption.TopDirectoryOnly))
+        {
+            var fullStateFilePath = Path.GetFullPath(stateFilePath);
+            if (configuredPaths.Contains(fullStateFilePath))
+            {
+                continue;
+            }
+
+            DateTime lastWriteUtc;
+
+            try
+            {
+                lastWriteUtc = File.GetLastWriteTimeUtc(fullStateFilePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to inspect orphaned runtime state file {StateFilePath} during cleanup.",
+                    fullStateFilePath);
+                continue;
+            }
+
+            if (retention > TimeSpan.Zero && lastWriteUtc > cutoffUtc)
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(fullStateFilePath);
+
+                _logger.LogInformation(
+                    "Deleted orphaned runtime state file {StateFilePath} during cleanup.",
+                    fullStateFilePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to delete orphaned runtime state file {StateFilePath} during cleanup.",
+                    fullStateFilePath);
             }
         }
     }

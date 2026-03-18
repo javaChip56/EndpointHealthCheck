@@ -99,6 +99,7 @@ builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
     var fileBackedStore = new FileBackedEndpointStateStore(
         config.Endpoints,
         resolvedStateDirectory,
+        runtimeStateOptions,
         serviceProvider.GetRequiredService<ILogger<FileBackedEndpointStateStore>>());
 
     logger.LogInformation(

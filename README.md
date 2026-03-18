@@ -31,6 +31,7 @@ Implemented so far:
 - Post-v1: CLI execution mode with JSON/XML reporting
 - Post-v1: YAML hot-reload for dashboard and endpoint files
 - Post-v1: per-endpoint current-state persistence with compact JSON files
+- Post-v1: runtime-state cleanup and retention settings for orphaned persisted state files
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -120,6 +121,7 @@ Current behavior:
 - keeps active runtime state in memory for fast reads by pages and the scheduler
 - can persist the latest current state for each endpoint to a compact JSON file under a configurable runtime-state directory
 - restores persisted current state on startup for configured endpoints and resets any stale `IsPolling` flag to `false`
+- can clean up orphaned persisted state files on a configurable interval after a configurable retention window
 - supports get-all, get-one, upsert, and reinitialize operations
 - returns deep copies so callers cannot mutate internal store state accidentally
 - uses thread-safe locking for concurrent access
@@ -321,6 +323,12 @@ The current primary setting is `Bootstrap:DashboardConfigPath`. `Bootstrap:Endpo
 
 Runtime state persistence is configured through `RuntimeState:Enabled` and `RuntimeState:DirectoryPath` in the same appsettings files. By default, the app writes compact per-endpoint current-state files under `runtime-state/endpoints` relative to the app content root.
 
+Current cleanup settings:
+- `RuntimeState:CleanupEnabled` to enable periodic runtime-state cleanup
+- `RuntimeState:CleanupIntervalMinutes` to control how often orphan cleanup runs
+- `RuntimeState:DeleteOrphanedStateFiles` to enable deletion of persisted state files that no longer belong to configured endpoints
+- `RuntimeState:OrphanedStateFileRetentionHours` to keep orphaned state files for a configurable grace period before deletion
+
 You can also override it with an environment variable:
 
 ```powershell
@@ -490,8 +498,7 @@ Test file:
 
 These are planned enhancements after the current v1 path:
 - optionally add short status history and mini trends so the dashboard can show recent health changes instead of only the latest snapshot
-- add configurable retention controls for persisted runtime data, including cleanup of old history files and orphaned endpoint state files
-- make runtime data cleanup best-effort and time-based, such as deleting eligible files older than a configured number of hours
+- add configurable retention controls for future persisted history files once trend capture is introduced
 - optionally add per-endpoint history files or embedded `recentSamples` arrays once trend capture is introduced
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API
 

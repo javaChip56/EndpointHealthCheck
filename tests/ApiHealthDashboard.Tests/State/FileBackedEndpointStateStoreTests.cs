@@ -21,6 +21,7 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         var store = new FileBackedEndpointStateStore(
             [CreateEndpoint("orders-api", "Orders API")],
             _stateDirectoryPath,
+            CreateRuntimeStateOptions(),
             logger);
 
         store.Upsert(new EndpointState
@@ -74,6 +75,7 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         var initialStore = new FileBackedEndpointStateStore(
             [CreateEndpoint("orders-api", "Orders API")],
             _stateDirectoryPath,
+            CreateRuntimeStateOptions(),
             new TestLogger<FileBackedEndpointStateStore>());
 
         initialStore.Upsert(new EndpointState
@@ -97,6 +99,7 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         var restoredStore = new FileBackedEndpointStateStore(
             [CreateEndpoint("orders-api", "Orders API Reloaded")],
             _stateDirectoryPath,
+            CreateRuntimeStateOptions(),
             new TestLogger<FileBackedEndpointStateStore>());
 
         var restoredState = restoredStore.Get("orders-api");
@@ -115,6 +118,7 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         var seedStore = new FileBackedEndpointStateStore(
             [CreateEndpoint("billing-api", "Billing API")],
             _stateDirectoryPath,
+            CreateRuntimeStateOptions(),
             new TestLogger<FileBackedEndpointStateStore>());
 
         seedStore.Upsert(new EndpointState
@@ -129,6 +133,7 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         var store = new FileBackedEndpointStateStore(
             [CreateEndpoint("orders-api", "Orders API")],
             _stateDirectoryPath,
+            CreateRuntimeStateOptions(),
             logger);
 
         store.Upsert(new EndpointState
@@ -164,6 +169,75 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         Assert.Equal("Billing API Reloaded", billingState.EndpointName);
     }
 
+    [Fact]
+    public void Initialize_DeletesOrphanedStateFilesWhenRetentionHasExpired()
+    {
+        var seedStore = new FileBackedEndpointStateStore(
+            [CreateEndpoint("billing-api", "Billing API")],
+            _stateDirectoryPath,
+            CreateRuntimeStateOptions(cleanupIntervalMinutes: 0, orphanedRetentionHours: 5),
+            new TestLogger<FileBackedEndpointStateStore>());
+
+        seedStore.Upsert(new EndpointState
+        {
+            EndpointId = "billing-api",
+            EndpointName = "Billing API",
+            Status = "Healthy"
+        });
+
+        var billingStateFile = Assert.Single(Directory.GetFiles(_stateDirectoryPath, "*.state.json"));
+        File.SetLastWriteTimeUtc(billingStateFile, DateTime.UtcNow.AddHours(-6));
+
+        seedStore.Initialize([CreateEndpoint("orders-api", "Orders API")]);
+
+        Assert.Empty(Directory.GetFiles(_stateDirectoryPath, "*.state.json"));
+    }
+
+    [Fact]
+    public void Initialize_KeepsRecentOrphanedStateFilesUntilRetentionExpires()
+    {
+        var seedStore = new FileBackedEndpointStateStore(
+            [CreateEndpoint("billing-api", "Billing API")],
+            _stateDirectoryPath,
+            CreateRuntimeStateOptions(cleanupIntervalMinutes: 0, orphanedRetentionHours: 5),
+            new TestLogger<FileBackedEndpointStateStore>());
+
+        seedStore.Upsert(new EndpointState
+        {
+            EndpointId = "billing-api",
+            EndpointName = "Billing API",
+            Status = "Healthy"
+        });
+
+        var billingStateFile = Assert.Single(Directory.GetFiles(_stateDirectoryPath, "*.state.json"));
+        File.SetLastWriteTimeUtc(billingStateFile, DateTime.UtcNow.AddHours(-1));
+
+        seedStore.Initialize([CreateEndpoint("orders-api", "Orders API")]);
+
+        Assert.Single(Directory.GetFiles(_stateDirectoryPath, "*.state.json"));
+    }
+
+    [Fact]
+    public void Initialize_DoesNotDeleteOrphanedStateFilesWhenCleanupIsDisabled()
+    {
+        var seedStore = new FileBackedEndpointStateStore(
+            [CreateEndpoint("billing-api", "Billing API")],
+            _stateDirectoryPath,
+            CreateRuntimeStateOptions(cleanupEnabled: true, cleanupIntervalMinutes: 0, deleteOrphanedStateFiles: false, orphanedRetentionHours: 0),
+            new TestLogger<FileBackedEndpointStateStore>());
+
+        seedStore.Upsert(new EndpointState
+        {
+            EndpointId = "billing-api",
+            EndpointName = "Billing API",
+            Status = "Healthy"
+        });
+
+        seedStore.Initialize([CreateEndpoint("orders-api", "Orders API")]);
+
+        Assert.Single(Directory.GetFiles(_stateDirectoryPath, "*.state.json"));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_stateDirectoryPath))
@@ -179,6 +253,23 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
             Id = id,
             Name = name,
             Url = $"https://{id}.example.com/health"
+        };
+    }
+
+    private static RuntimeStateOptions CreateRuntimeStateOptions(
+        bool cleanupEnabled = true,
+        double cleanupIntervalMinutes = 30,
+        bool deleteOrphanedStateFiles = true,
+        double orphanedRetentionHours = 5)
+    {
+        return new RuntimeStateOptions
+        {
+            Enabled = true,
+            DirectoryPath = "runtime-state/endpoints",
+            CleanupEnabled = cleanupEnabled,
+            CleanupIntervalMinutes = cleanupIntervalMinutes,
+            DeleteOrphanedStateFiles = deleteOrphanedStateFiles,
+            OrphanedStateFileRetentionHours = orphanedRetentionHours
         };
     }
 
