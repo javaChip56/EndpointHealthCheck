@@ -4,6 +4,7 @@ using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
 namespace ApiHealthDashboard.Pages;
 
@@ -34,9 +35,22 @@ public class IndexModel : PageModel
 
     public bool HasConfiguredEndpoints => Endpoints.Count > 0;
 
+    public int RefreshUiSeconds => _dashboardConfig.Dashboard.RefreshUiSeconds;
+
     public void OnGet()
     {
         LoadDashboard();
+    }
+
+    public IActionResult OnGetLiveSection()
+    {
+        LoadDashboard();
+
+        return new PartialViewResult
+        {
+            ViewName = "_DashboardLiveSection",
+            ViewData = new ViewDataDictionary<IndexModel>(ViewData, this)
+        };
     }
 
     public async Task<IActionResult> OnPostRefreshAllAsync(CancellationToken cancellationToken)
@@ -157,6 +171,8 @@ public class IndexModel : PageModel
 
         public bool IsPolling { get; init; }
 
+        public bool ShowIdHint { get; init; }
+
         public string LastCheckedText { get; init; } = "Never";
 
         public string LastSuccessfulText { get; init; } = "Never";
@@ -173,6 +189,8 @@ public class IndexModel : PageModel
                 ? "Polling"
                 : Status;
 
+        public bool ShowStatusDescription => !string.Equals(StatusDescription, Status, StringComparison.OrdinalIgnoreCase);
+
         public static EndpointSummaryViewModel From(EndpointConfig endpoint, EndpointState? state)
         {
             var status = state?.Status ?? "Unknown";
@@ -186,6 +204,7 @@ public class IndexModel : PageModel
                 FrequencyText = $"{endpoint.FrequencySeconds} sec",
                 Enabled = endpoint.Enabled,
                 IsPolling = state?.IsPolling ?? false,
+                ShowIdHint = ShouldShowIdHint(endpoint.Name, endpoint.Id),
                 LastCheckedText = FormatDateTime(state?.LastCheckedUtc),
                 LastSuccessfulText = FormatDateTime(state?.LastSuccessfulUtc),
                 DurationText = state?.DurationMs is long durationMs ? $"{durationMs} ms" : "-",
@@ -196,6 +215,37 @@ public class IndexModel : PageModel
         private static string FormatDateTime(DateTimeOffset? value)
         {
             return value?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'") ?? "Never";
+        }
+
+        private static bool ShouldShowIdHint(string name, string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return true;
+            }
+
+            return !string.Equals(NormalizeForComparison(name), NormalizeForComparison(id), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeForComparison(string value)
+        {
+            var buffer = new char[value.Length];
+            var length = 0;
+
+            foreach (var character in value)
+            {
+                if (char.IsLetterOrDigit(character))
+                {
+                    buffer[length++] = char.ToLowerInvariant(character);
+                }
+            }
+
+            return new string(buffer, 0, length);
         }
 
         private static string ToBadgeClass(string status)

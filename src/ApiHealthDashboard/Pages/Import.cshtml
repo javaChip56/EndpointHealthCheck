@@ -1,0 +1,383 @@
+@page
+@model ApiHealthDashboard.Pages.ImportModel
+@{
+    ViewData["Title"] = "Import Endpoint";
+    var validationMessages = ViewData.ModelState.Values
+        .SelectMany(static entry => entry.Errors)
+        .Select(static error => string.IsNullOrWhiteSpace(error.ErrorMessage)
+            ? error.Exception?.Message
+            : error.ErrorMessage)
+        .Where(static message => !string.IsNullOrWhiteSpace(message))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+}
+
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">Import Endpoint</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a asp-page="/Index">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Import Endpoint</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="dashboard-hero card card-outline card-primary">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <span class="hero-kicker">Import Preview</span>
+                        <h2 class="hero-title">Probe an API, inspect the response, and generate endpoint YAML</h2>
+                        <p class="hero-copy mb-0">
+                            This flow sends a live request, inspects the response, suggests endpoint metadata, and shows a diff
+                            against the currently loaded config. Saving remains manual so you can review before editing YAML files.
+                        </p>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="hero-panel">
+                            <div class="hero-stat">
+                                <span class="hero-stat-label">Loaded endpoints</span>
+                                <strong>@Model.ExistingEndpointCount</strong>
+                            </div>
+                            <div class="hero-stat">
+                                <span class="hero-stat-label">Comparison mode</span>
+                                <strong>@(Model.HasExistingEndpoints ? "Enabled" : "No current matches")</strong>
+                            </div>
+                            <div class="hero-stat mb-0">
+                                <span class="hero-stat-label">Save behavior</span>
+                                <strong>Manual only</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-7">
+                <div class="card card-outline card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">Request And Import Settings</h3>
+                    </div>
+                    <div class="card-body">
+                        @if (validationMessages.Length > 0)
+                        {
+                            <div class="alert alert-warning import-validation-summary" role="alert">
+                                <ul class="mb-0 pl-3">
+                                    @foreach (var message in validationMessages)
+                                    {
+                                        <li>@message</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.FrequencyRecommendationWarning))
+                        {
+                            <div class="alert alert-warning import-soft-warning" role="alert">
+                                @Model.FrequencyRecommendationWarning
+                            </div>
+                        }
+
+                        <form method="post" asp-page-handler="Preview" class="import-form">
+                            <div class="import-form-section">
+                                <div class="import-section-label">Endpoint Probe</div>
+                                <div class="form-group mb-0">
+                                    <label asp-for="Input.Url"></label>
+                                    <input asp-for="Input.Url" class="form-control" placeholder="https://orders.example.com/health" />
+                                    <small class="form-text text-muted">Supports absolute HTTP and HTTPS health endpoint URLs.</small>
+                                </div>
+                            </div>
+
+                            <div class="import-form-section">
+                                <div class="import-section-label">Suggested Endpoint Metadata</div>
+                                <div class="form-row">
+                                    <div class="form-group col-md-6">
+                                        <label asp-for="Input.Id"></label>
+                                        <input asp-for="Input.Id" class="form-control" placeholder="Auto-suggest if left blank" />
+                                    </div>
+                                    <div class="form-group col-md-6">
+                                        <label asp-for="Input.Name"></label>
+                                        <input asp-for="Input.Name" class="form-control" placeholder="Auto-suggest if left blank" />
+                                    </div>
+                                </div>
+                                <div class="form-row mb-0">
+                                    <div class="form-group col-md-6">
+                                        <label asp-for="Input.FrequencySeconds">Poll frequency (sec)</label>
+                                        <input asp-for="Input.FrequencySeconds" class="form-control" />
+                                        <small class="form-text text-muted">Recommended minimum: @Model.MinimumRecommendedPollFrequencySeconds seconds.</small>
+                                    </div>
+                                    <div class="form-group col-md-6">
+                                        <label asp-for="Input.TimeoutSeconds">Timeout (sec)</label>
+                                        <input asp-for="Input.TimeoutSeconds" class="form-control" placeholder="Default" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="import-form-section">
+                                <div class="import-section-label">Request Headers</div>
+                                <div class="form-group mb-0">
+                                    <label asp-for="Input.HeadersText"></label>
+                                    <textarea asp-for="Input.HeadersText"
+                                              class="form-control import-headers-box"
+                                              rows="6"
+                                              placeholder="Authorization: Bearer ${TOKEN}&#10;X-Environment: staging"></textarea>
+                                    <small class="form-text text-muted">Use one header per line in the format <code>Name: value</code>.</small>
+                                </div>
+                            </div>
+
+                            <div class="import-toggle-panel">
+                                <div class="import-toggle-item">
+                                    <div class="custom-control custom-switch">
+                                        <input asp-for="Input.Enabled" class="custom-control-input" />
+                                        <label asp-for="Input.Enabled" class="custom-control-label"></label>
+                                    </div>
+                                    <small class="text-muted import-toggle-copy">Controls the suggested YAML value only. It does not disable the preview probe.</small>
+                                </div>
+                                <div class="import-toggle-item">
+                                    <div class="custom-control custom-checkbox">
+                                        <input asp-for="Input.IncludeDiscoveredChecks" class="custom-control-input" />
+                                        <label asp-for="Input.IncludeDiscoveredChecks" class="custom-control-label"></label>
+                                    </div>
+                                    <small class="text-muted import-toggle-copy">When checked, discovered top-level checks will be added to the generated <code>includeChecks</code> list.</small>
+                                </div>
+                            </div>
+
+                            <div class="import-form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-vial mr-1"></i>Probe And Preview YAML
+                                </button>
+                                <span class="text-muted">Preview only. YAML file edits stay manual.</span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card card-outline card-secondary">
+                    <div class="card-header">
+                        <h3 class="card-title">How This Works</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="import-guidance-item">
+                            <h4>1. Probe the endpoint</h4>
+                            <p class="text-muted mb-0">The dashboard sends a live request with the URL, timeout, and headers you provide.</p>
+                        </div>
+                        <div class="import-guidance-item">
+                            <h4>2. Inspect the response</h4>
+                            <p class="text-muted mb-0">We parse the response when possible, summarize discovered checks, and keep a preview of the raw body.</p>
+                        </div>
+                        <div class="import-guidance-item">
+                            <h4>3. Review the generated YAML</h4>
+                            <p class="text-muted mb-0">Use the proposed snippet and diff to manually update <code>dashboard.yaml</code> or a separate endpoint YAML file.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.Result is not null)
+        {
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="card card-outline card-primary">
+                        <div class="card-header">
+                            <h3 class="card-title">Probe Summary</h3>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row mb-0 import-summary-list">
+                                <dt class="col-sm-5">Result</dt>
+                                <dd class="col-sm-7">@Model.Result.ProbeResult.Kind</dd>
+                                <dt class="col-sm-5">HTTP</dt>
+                                <dd class="col-sm-7">@Model.Result.ProbeHttpStatusText</dd>
+                                <dt class="col-sm-5">Duration</dt>
+                                <dd class="col-sm-7">@Model.Result.ProbeResult.DurationMs ms</dd>
+                                <dt class="col-sm-5">Parser status</dt>
+                                <dd class="col-sm-7">@(Model.Result.ParserStatus ?? "Not parsed")</dd>
+                            </dl>
+
+                            <div class="alert @(Model.Result.ProbeResult.IsSuccess ? "alert-success" : "alert-warning") mt-3 mb-0">
+                                @Model.Result.ProbeStatusText
+                                @if (Model.Result.IsEndpointNotFound)
+                                {
+                                    <div class="mt-2">YAML preview is not generated when the endpoint returns HTTP 404 Not Found.</div>
+                                }
+                                else if (!Model.Result.ProbeResult.IsSuccess)
+                                {
+                                    <div class="mt-2">YAML preview is still available below based on the request settings you entered.</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(Model.Result.ParserError))
+                                {
+                                    <div class="mt-2"><strong>Parser note:</strong> @Model.Result.ParserError</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card card-outline card-secondary">
+                        <div class="card-header">
+                            <h3 class="card-title">Suggested Endpoint</h3>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row mb-0 import-summary-list">
+                                <dt class="col-sm-4">Id</dt>
+                                <dd class="col-sm-8">@Model.Result.SuggestedEndpoint.Id</dd>
+                                <dt class="col-sm-4">Name</dt>
+                                <dd class="col-sm-8">@Model.Result.SuggestedEndpoint.Name</dd>
+                                <dt class="col-sm-4">URL</dt>
+                                <dd class="col-sm-8 import-break">@Model.Result.SuggestedEndpoint.Url</dd>
+                                <dt class="col-sm-4">Checks</dt>
+                                <dd class="col-sm-8">@(Model.Result.TopLevelCheckNames.Count > 0 ? string.Join(", ", Model.Result.TopLevelCheckNames) : "None discovered")</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card card-outline @(Model.Result.HasExistingMatch ? "card-warning" : "card-success")">
+                        <div class="card-header">
+                            <h3 class="card-title">Comparison</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-0">@Model.Result.MatchSummary</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card card-outline card-primary">
+                        <div class="card-header">
+                            <h3 class="card-title">Generated YAML</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.Result.HasGeneratedYamlPreview)
+                            {
+                                <div class="import-preview-header">
+                                    <p class="text-muted mb-0">Copy this into <code>dashboard.yaml</code> or an endpoint YAML file after review.</p>
+                                    <div class="import-preview-actions">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                data-copy-target="#generated-yaml-preview"
+                                                data-copy-feedback="#generated-yaml-copy-feedback">
+                                            <i class="fas fa-copy mr-1"></i>Copy YAML
+                                        </button>
+                                        <small id="generated-yaml-copy-feedback" class="text-muted import-copy-feedback" aria-live="polite"></small>
+                                    </div>
+                                </div>
+                                <pre id="generated-yaml-preview" class="import-code-block"><code>@Model.Result.GeneratedYaml</code></pre>
+                            }
+                            else
+                            {
+                                <div class="alert alert-light mb-0">No YAML preview was generated for this probe result.</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card card-outline card-secondary">
+                        <div class="card-header">
+                            <h3 class="card-title">Diff Preview</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!Model.Result.HasGeneratedYamlPreview)
+                            {
+                                <div class="alert alert-light mb-0">Diff preview is unavailable because no YAML preview was generated.</div>
+                            }
+                            else if (Model.Result.HasExistingMatch && Model.Result.HasDiff)
+                            {
+                                <div class="import-diff-block" role="region" aria-label="YAML diff preview">
+                                    @foreach (var line in Model.Result.DiffLines)
+                                    {
+                                        <div class="import-diff-line @line.CssClass"><span class="diff-prefix">@line.Prefix</span><span>@line.Text</span></div>
+                                    }
+                                </div>
+                            }
+                            else if (Model.Result.HasExistingMatch)
+                            {
+                                <div class="alert alert-info mb-0">The generated YAML matches the existing normalized endpoint config.</div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-info mb-0">No existing endpoint matched, so there is no diff to show yet.</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card card-outline card-secondary">
+                        <div class="card-header">
+                            <h3 class="card-title">Discovered Checks</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.Result.DiscoveredChecks.Count == 0)
+                            {
+                                <p class="text-muted mb-0">No health checks were discovered in the response.</p>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover import-check-table mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Path</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var check in Model.Result.DiscoveredChecks)
+                                            {
+                                                <tr>
+                                                    <td class="import-break">@check.Path</td>
+                                                    <td>@check.Status</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card card-outline card-secondary">
+                        <div class="card-header">
+                            <h3 class="card-title">Response Preview</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.Result.HasResponsePreview)
+                            {
+                                @if (Model.Result.ResponsePreviewWasTruncated)
+                                {
+                                    <p class="text-muted">The response preview was truncated for display.</p>
+                                }
+
+                                <pre class="import-code-block import-response-preview"><code>@Model.Result.ResponsePreview</code></pre>
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0">No response body was captured for preview.</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</section>

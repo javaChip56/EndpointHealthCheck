@@ -3,6 +3,9 @@ using ApiHealthDashboard.Pages;
 using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ApiHealthDashboard.Tests.Pages;
@@ -130,6 +133,26 @@ public sealed class IndexModelTests
     }
 
     [Fact]
+    public void OnGetLiveSection_ReturnsDashboardPartial()
+    {
+        var config = CreateConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance)
+        {
+            PageContext = new PageContext
+            {
+                ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
+            }
+        };
+
+        var result = model.OnGetLiveSection();
+
+        var partial = Assert.IsType<PartialViewResult>(result);
+        Assert.Equal("_DashboardLiveSection", partial.ViewName);
+        Assert.Equal(config.Dashboard.RefreshUiSeconds, model.RefreshUiSeconds);
+    }
+
+    [Fact]
     public void OnGet_CountsDisabledAndUnknownEndpoints()
     {
         var config = CreateConfig();
@@ -156,6 +179,10 @@ public sealed class IndexModelTests
     {
         return new DashboardConfig
         {
+            Dashboard = new DashboardSettings
+            {
+                RefreshUiSeconds = 10
+            },
             Endpoints =
             [
                 new EndpointConfig

@@ -12,6 +12,8 @@ builder.Configuration.AddEnvironmentVariables(prefix: "APIHEALTHDASHBOARD_");
 // Add services to the container.
 builder.Services.Configure<DashboardBootstrapOptions>(
     builder.Configuration.GetSection(DashboardBootstrapOptions.SectionName));
+builder.Services.Configure<ImportUiOptions>(
+    builder.Configuration.GetSection(ImportUiOptions.SectionName));
 builder.Services.AddSingleton<DashboardConfigValidator>();
 builder.Services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 builder.Services.AddSingleton(static serviceProvider =>
@@ -29,14 +31,19 @@ builder.Services.AddSingleton(static serviceProvider =>
 
     try
     {
-        var config = loader.Load(resolvedPath);
+        var loadResult = loader.Load(resolvedPath);
+
+        foreach (var warning in loadResult.Warnings)
+        {
+            logger.LogWarning("{ConfigurationWarning}", warning);
+        }
 
         logger.LogInformation(
             "Loaded dashboard configuration from {ConfigPath} with {EndpointCount} endpoints.",
             resolvedPath,
-            config.Endpoints.Count);
+            loadResult.Config.Endpoints.Count);
 
-        return config;
+        return loadResult;
     }
     catch (Exception ex)
     {
@@ -47,6 +54,13 @@ builder.Services.AddSingleton(static serviceProvider =>
         throw;
     }
 });
+builder.Services.AddSingleton(static serviceProvider =>
+{
+    var loadResult = serviceProvider.GetRequiredService<DashboardConfigLoadResult>();
+    return new ConfigurationWarningState(loadResult.Warnings);
+});
+builder.Services.AddSingleton(static serviceProvider =>
+    serviceProvider.GetRequiredService<DashboardConfigLoadResult>().Config);
 builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<DashboardConfig>();
@@ -63,6 +77,7 @@ builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient(nameof(EndpointPoller));
 builder.Services.AddSingleton<IEndpointPoller, EndpointPoller>();
+builder.Services.AddSingleton<IEndpointImportService, EndpointImportService>();
 builder.Services.AddSingleton<IHealthResponseParser, HealthResponseParser>();
 builder.Services.AddSingleton<PollingSchedulerService>();
 builder.Services.AddSingleton<IEndpointScheduler>(static serviceProvider =>

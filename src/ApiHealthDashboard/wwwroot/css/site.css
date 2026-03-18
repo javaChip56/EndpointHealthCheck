@@ -20,6 +20,11 @@ body {
   background: transparent;
 }
 
+.configuration-warning-banner {
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 30px rgba(217, 119, 6, 0.12);
+}
+
 .sidebar-avatar {
   display: grid;
   width: 2.35rem;
@@ -147,10 +152,19 @@ body {
   border-radius: 0.85rem;
   color: #e5edf8;
   background: #142033;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: auto;
+  line-height: 1.6;
+  font-size: 0.88rem;
 }
 
 .payload-preview code {
+  display: block;
   color: inherit;
+  white-space: inherit;
+  overflow-wrap: inherit;
 }
 
 .nested-health-group {
@@ -220,6 +234,174 @@ body {
 
 .dashboard-refresh-all-form {
   margin-bottom: 0;
+}
+
+.import-validation-summary:empty {
+  display: none;
+}
+
+.import-validation-summary.validation-summary-valid {
+  display: none;
+}
+
+.import-soft-warning {
+  border-radius: 0.85rem;
+}
+
+.import-form {
+  display: grid;
+  gap: 1.15rem;
+}
+
+.import-form-section {
+  padding: 1rem 1rem 0.35rem;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 1));
+}
+
+.import-section-label {
+  margin-bottom: 0.85rem;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.import-headers-box {
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.import-toggle-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem 1rem 0.85rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.import-toggle-copy {
+  display: block;
+  margin-top: 0.5rem;
+  margin-left: 2rem;
+  line-height: 1.45;
+}
+
+.import-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.import-guidance-item + .import-guidance-item {
+  margin-top: 1.25rem;
+}
+
+.import-guidance-item h4 {
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.import-summary-list dt,
+.import-summary-list dd {
+  margin-bottom: 0.65rem;
+}
+
+.import-break {
+  word-break: break-word;
+}
+
+.import-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.import-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.import-copy-feedback {
+  min-width: 3.5rem;
+}
+
+.import-code-block {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.85rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.import-code-block code {
+  display: block;
+  white-space: inherit;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.import-response-preview {
+  max-height: 32rem;
+  overflow: auto;
+  line-height: 1.65;
+}
+
+.import-diff-block {
+  margin: 0;
+  padding: 0.85rem 0;
+  border-radius: 0.85rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+.import-diff-line {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.1rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff-prefix {
+  width: 1rem;
+  flex: 0 0 1rem;
+}
+
+.diff-added {
+  background: rgba(34, 197, 94, 0.18);
+  color: #dcfce7;
+}
+
+.diff-removed {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fee2e2;
+}
+
+.diff-context {
+  color: #cbd5e1;
+}
+
+.import-check-table td,
+.import-check-table th {
+  vertical-align: top;
 }
 
 .dashboard-empty-state-compact {
@@ -342,6 +524,22 @@ body {
 @media (max-width: 991.98px) {
   .hero-title {
     font-size: 1.65rem;
+  }
+
+  .import-form-section {
+    padding: 0.9rem 0.9rem 0.25rem;
+  }
+
+  .import-form-actions {
+    align-items: flex-start;
+  }
+
+  .import-preview-header {
+    align-items: flex-start;
+  }
+
+  .import-toggle-copy {
+    margin-left: 0;
   }
 
   .endpoint-search-tools {

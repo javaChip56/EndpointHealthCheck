@@ -1,7 +1,9 @@
+@inject ApiHealthDashboard.Configuration.ConfigurationWarningState ConfigurationWarnings
 @{
     var currentPage = ViewContext.RouteData.Values["page"] as string ?? string.Empty;
     var isDashboardPage = currentPage == "/Index";
     var isEndpointPage = currentPage.StartsWith("/Endpoints");
+    var isImportPage = currentPage == "/Import";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -71,12 +73,32 @@
                                 <p>Endpoint Details</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a asp-page="/Import" class="nav-link @(isImportPage ? "active" : string.Empty)">
+                                <i class="nav-icon fas fa-file-import"></i>
+                                <p>Import Endpoint</p>
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>
         </aside>
 
         <main class="content-wrapper">
+            @if (ConfigurationWarnings.HasWarnings)
+            {
+                <div class="container-fluid pt-3">
+                    <div class="alert alert-warning configuration-warning-banner" role="alert">
+                        <h5 class="mb-2">Configuration Warning</h5>
+                        <ul class="mb-0 pl-3">
+                            @foreach (var warning in ConfigurationWarnings.Warnings)
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
             @RenderBody()
         </main>
 

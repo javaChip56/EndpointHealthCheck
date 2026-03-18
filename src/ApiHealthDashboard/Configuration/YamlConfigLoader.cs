@@ -18,12 +18,25 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
             .Build();
     }
 
-    public DashboardConfig Load(string path)
+    public DashboardConfigLoadResult Load(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
+        if (!File.Exists(path))
+        {
+            return new DashboardConfigLoadResult
+            {
+                Config = new DashboardConfig(),
+                Warnings =
+                [
+                    $"Dashboard configuration file '{path}' was not found. The dashboard started with no configured endpoints."
+                ]
+            };
+        }
+
         var dashboardConfig = DeserializeDashboardConfig(path);
         Normalize(dashboardConfig);
+        var warnings = new List<string>();
 
         var mergedConfig = new DashboardConfig
         {
@@ -39,6 +52,12 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
         foreach (var endpointFilePath in dashboardConfig.EndpointFiles)
         {
             var resolvedEndpointFilePath = ResolveConfigPath(endpointFilePath, dashboardDirectory);
+            if (!File.Exists(resolvedEndpointFilePath))
+            {
+                warnings.Add($"Endpoint configuration file '{resolvedEndpointFilePath}' was not found. It was skipped.");
+                continue;
+            }
+
             var fileEndpoints = LoadEndpointsFromFile(resolvedEndpointFilePath);
             mergedConfig.Endpoints.AddRange(fileEndpoints);
         }
@@ -51,7 +70,11 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
             throw new DashboardConfigurationException(path, errors);
         }
 
-        return mergedConfig;
+        return new DashboardConfigLoadResult
+        {
+            Config = mergedConfig,
+            Warnings = warnings
+        };
     }
 
     private DashboardConfig DeserializeDashboardConfig(string path)

@@ -1,5 +1,6 @@
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
+using ApiHealthDashboard.Formatting;
 using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
@@ -234,7 +235,7 @@ public class DetailsModel : PageModel
                 DegradedCheckCount = flattenedNodes.Count(static node => node.Status == "Degraded"),
                 UnhealthyCheckCount = flattenedNodes.Count(static node => node.Status == "Unhealthy"),
                 UnknownCheckCount = flattenedNodes.Count(static node => node.Status is not ("Healthy" or "Degraded" or "Unhealthy")),
-                RawPayload = showRawPayload ? state?.Snapshot?.RawPayload : null,
+                RawPayload = showRawPayload ? FormatPayloadPreview(state?.Snapshot?.RawPayload) : null,
                 ShowRawPayload = showRawPayload
             };
         }
@@ -285,13 +286,30 @@ public class DetailsModel : PageModel
 
         private static string FormatMetadataValue(object? value)
         {
-            return value switch
+            return DisplayValueFormatter.Format(value);
+        }
+
+        private static string? FormatPayloadPreview(string? rawPayload)
+        {
+            if (string.IsNullOrWhiteSpace(rawPayload))
             {
-                null => "(null)",
-                string text when string.IsNullOrWhiteSpace(text) => "(empty)",
-                string text => text,
-                _ => JsonSerializer.Serialize(value)
-            };
+                return rawPayload;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(rawPayload);
+                return JsonSerializer.Serialize(
+                    document.RootElement,
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
+            }
+            catch (JsonException)
+            {
+                return rawPayload;
+            }
         }
 
         private static string ToBadgeClass(string status)
