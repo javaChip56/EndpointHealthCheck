@@ -39,7 +39,8 @@ public sealed class YamlConfigLoaderTests : IDisposable
                   - optional-third-party
             """);
 
-        var config = _loader.Load(configPath);
+        var result = _loader.Load(configPath);
+        var config = result.Config;
 
         Assert.Equal(15, config.Dashboard.RefreshUiSeconds);
         Assert.Equal(12, config.Dashboard.RequestTimeoutSecondsDefault);
@@ -55,6 +56,7 @@ public sealed class YamlConfigLoaderTests : IDisposable
         Assert.Equal("enabled", endpoint.Headers["X-Trace"]);
         Assert.Equal(["self", "database"], endpoint.IncludeChecks);
         Assert.Equal(["optional-third-party"], endpoint.ExcludeChecks);
+        Assert.Empty(result.Warnings);
     }
 
     [Fact]
@@ -72,7 +74,7 @@ public sealed class YamlConfigLoaderTests : IDisposable
                 excludeChecks:
             """);
 
-        var config = _loader.Load(configPath);
+        var config = _loader.Load(configPath).Config;
         var endpoint = Assert.Single(config.Endpoints);
 
         Assert.Empty(endpoint.Headers);
@@ -154,7 +156,7 @@ public sealed class YamlConfigLoaderTests : IDisposable
                       X-Api-Key: ${{{variableName}}}
                 """);
 
-            var config = _loader.Load(configPath);
+            var config = _loader.Load(configPath).Config;
 
             Assert.Equal("secret-value", config.Endpoints[0].Headers["X-Api-Key"]);
         }
@@ -165,13 +167,14 @@ public sealed class YamlConfigLoaderTests : IDisposable
     }
 
     [Fact]
-    public void Load_WithMissingFile_ThrowsHelpfulError()
+    public void Load_WithMissingDashboardFile_ReturnsWarningAndEmptyConfig()
     {
         var missingPath = Path.Combine(_tempDirectory, "missing.yaml");
 
-        var exception = Assert.Throws<DashboardConfigurationException>(() => _loader.Load(missingPath));
+        var result = _loader.Load(missingPath);
 
-        Assert.Contains("was not found", exception.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.Config.Endpoints);
+        Assert.Contains("was not found", result.Warnings.Single(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -228,7 +231,8 @@ public sealed class YamlConfigLoaderTests : IDisposable
               - endpoints/services.yaml
             """);
 
-        var config = _loader.Load(dashboardConfigPath);
+        var result = _loader.Load(dashboardConfigPath);
+        var config = result.Config;
 
         Assert.Equal(20, config.Dashboard.RefreshUiSeconds);
         Assert.Equal(15, config.Dashboard.RequestTimeoutSecondsDefault);
@@ -237,21 +241,34 @@ public sealed class YamlConfigLoaderTests : IDisposable
         Assert.Contains(config.Endpoints, static endpoint => endpoint.Id == "orders-api");
         Assert.Contains(config.Endpoints, static endpoint => endpoint.Id == "billing-api");
         Assert.Contains(config.Endpoints, static endpoint => endpoint.Id == "notifications-api");
+        Assert.Empty(result.Warnings);
     }
 
     [Fact]
-    public void Load_WithMissingEndpointFile_ThrowsHelpfulError()
+    public void Load_WithMissingEndpointFile_ReturnsWarningAndContinues()
     {
+        WriteNamedConfig(
+            "endpoints/orders-api.yaml",
+            """
+            id: orders-api
+            name: Orders API
+            url: https://orders.example.com/health
+            frequencySeconds: 30
+            """);
+
         var dashboardConfigPath = WriteNamedConfig(
             "dashboard.yaml",
             """
             endpointFiles:
+              - endpoints/orders-api.yaml
               - endpoints/missing.yaml
             """);
 
-        var exception = Assert.Throws<DashboardConfigurationException>(() => _loader.Load(dashboardConfigPath));
+        var result = _loader.Load(dashboardConfigPath);
 
-        Assert.Contains("missing.yaml", exception.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Single(result.Config.Endpoints);
+        Assert.Equal("orders-api", result.Config.Endpoints[0].Id);
+        Assert.Contains("missing.yaml", result.Warnings.Single(), StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose()

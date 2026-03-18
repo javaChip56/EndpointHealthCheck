@@ -40,7 +40,7 @@
                     <ul class="health-node-data mb-0 mt-2">
                         @foreach (var item in Model.Data.OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase))
                         {
-                            <li><code>@item.Key</code>: @item.Value</li>
+                            <li><code>@item.Key</code>: @ApiHealthDashboard.Formatting.DisplayValueFormatter.Format(item.Value)</li>
                         }
                     </ul>
                 </div>
@@ -83,7 +83,7 @@ else
                     <ul class="health-node-data mb-0 mt-2">
                         @foreach (var item in Model.Data.OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase))
                         {
-                            <li><code>@item.Key</code>: @item.Value</li>
+                            <li><code>@item.Key</code>: @ApiHealthDashboard.Formatting.DisplayValueFormatter.Format(item.Value)</li>
                         }
                     </ul>
                 </div>

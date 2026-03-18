@@ -20,6 +20,11 @@ body {
   background: transparent;
 }
 
+.configuration-warning-banner {
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 30px rgba(217, 119, 6, 0.12);
+}
+
 .sidebar-avatar {
   display: grid;
   width: 2.35rem;

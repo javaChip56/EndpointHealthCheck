@@ -29,14 +29,19 @@ builder.Services.AddSingleton(static serviceProvider =>
 
     try
     {
-        var config = loader.Load(resolvedPath);
+        var loadResult = loader.Load(resolvedPath);
+
+        foreach (var warning in loadResult.Warnings)
+        {
+            logger.LogWarning("{ConfigurationWarning}", warning);
+        }
 
         logger.LogInformation(
             "Loaded dashboard configuration from {ConfigPath} with {EndpointCount} endpoints.",
             resolvedPath,
-            config.Endpoints.Count);
+            loadResult.Config.Endpoints.Count);
 
-        return config;
+        return loadResult;
     }
     catch (Exception ex)
     {
@@ -47,6 +52,13 @@ builder.Services.AddSingleton(static serviceProvider =>
         throw;
     }
 });
+builder.Services.AddSingleton(static serviceProvider =>
+{
+    var loadResult = serviceProvider.GetRequiredService<DashboardConfigLoadResult>();
+    return new ConfigurationWarningState(loadResult.Warnings);
+});
+builder.Services.AddSingleton(static serviceProvider =>
+    serviceProvider.GetRequiredService<DashboardConfigLoadResult>().Config);
 builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<DashboardConfig>();

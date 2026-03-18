@@ -184,7 +184,10 @@
                                         <tr data-endpoint-search-row data-endpoint-search-text="@searchText">
                                             <td>
                                                 <div class="font-weight-semibold">@endpoint.Name</div>
-                                                <small class="text-muted">@endpoint.Id</small>
+                                                @if (endpoint.ShowIdHint)
+                                                {
+                                                    <small class="text-muted">@endpoint.Id</small>
+                                                }
                                                 @if (!endpoint.Enabled)
                                                 {
                                                     <div><small class="text-muted">Disabled in YAML</small></div>
@@ -192,7 +195,10 @@
                                             </td>
                                             <td>
                                                 <span class="badge @endpoint.StatusBadgeClass">@endpoint.Status</span>
-                                                <div><small class="text-muted">@endpoint.StatusDescription</small></div>
+                                                @if (endpoint.ShowStatusDescription)
+                                                {
+                                                    <div><small class="text-muted">@endpoint.StatusDescription</small></div>
+                                                }
                                             </td>
                                             <td>@endpoint.LastCheckedText</td>
                                             <td>@endpoint.LastSuccessfulText</td>

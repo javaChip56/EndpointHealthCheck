@@ -1,5 +1,6 @@
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
+using ApiHealthDashboard.Formatting;
 using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
@@ -285,13 +286,7 @@ public class DetailsModel : PageModel
 
         private static string FormatMetadataValue(object? value)
         {
-            return value switch
-            {
-                null => "(null)",
-                string text when string.IsNullOrWhiteSpace(text) => "(empty)",
-                string text => text,
-                _ => JsonSerializer.Serialize(value)
-            };
+            return DisplayValueFormatter.Format(value);
         }
 
         private static string? FormatPayloadPreview(string? rawPayload)

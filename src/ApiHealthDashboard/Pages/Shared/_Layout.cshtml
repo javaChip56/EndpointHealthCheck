@@ -1,3 +1,4 @@
+@inject ApiHealthDashboard.Configuration.ConfigurationWarningState ConfigurationWarnings
 @{
     var currentPage = ViewContext.RouteData.Values["page"] as string ?? string.Empty;
     var isDashboardPage = currentPage == "/Index";
@@ -84,6 +85,20 @@
         </aside>
 
         <main class="content-wrapper">
+            @if (ConfigurationWarnings.HasWarnings)
+            {
+                <div class="container-fluid pt-3">
+                    <div class="alert alert-warning configuration-warning-banner" role="alert">
+                        <h5 class="mb-2">Configuration Warning</h5>
+                        <ul class="mb-0 pl-3">
+                            @foreach (var warning in ConfigurationWarnings.Warnings)
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
             @RenderBody()
         </main>
 

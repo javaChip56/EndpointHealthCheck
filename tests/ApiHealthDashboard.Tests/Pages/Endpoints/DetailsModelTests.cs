@@ -104,7 +104,8 @@ public sealed class DetailsModelTests
                 Metadata = new Dictionary<string, object?>
                 {
                     ["region"] = "sgp-1",
-                    ["statusCode"] = 200
+                    ["statusCode"] = 200,
+                    ["tags"] = new List<object>()
                 },
                 Nodes =
                 [
@@ -147,7 +148,8 @@ public sealed class DetailsModelTests
         Assert.Equal("********", model.Endpoint.Headers.Single().ValuePreview);
         Assert.Equal(["database"], model.Endpoint.IncludeChecks);
         Assert.Equal(["cache"], model.Endpoint.ExcludeChecks);
-        Assert.Equal(2, model.Endpoint.SnapshotMetadata.Count);
+        Assert.Equal(3, model.Endpoint.SnapshotMetadata.Count);
+        Assert.Equal("(empty)", model.Endpoint.SnapshotMetadata.Single(static item => item.Name == "tags").Value);
         Assert.Equal(
             "{\n  \"status\": \"Degraded\"\n}",
             model.Endpoint.RawPayload!.Replace("\r\n", "\n", StringComparison.Ordinal));
