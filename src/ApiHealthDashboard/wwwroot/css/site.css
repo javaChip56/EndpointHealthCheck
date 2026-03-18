@@ -194,6 +194,123 @@ body {
   white-space: normal;
 }
 
+.dashboard-empty-state-compact {
+  min-height: 12rem;
+  padding: 1.5rem;
+}
+
+.filter-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filter-chip {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(31, 41, 55, 0.1);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.metadata-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.metadata-item {
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.metadata-value {
+  margin-top: 0.35rem;
+  word-break: break-word;
+}
+
+.health-check-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.health-chip {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  font-size: 0.8rem;
+}
+
+.health-node-card {
+  margin-bottom: 1rem;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.04);
+}
+
+.health-node-details[open] {
+  background: #fff;
+}
+
+.health-node-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  cursor: pointer;
+}
+
+.health-node-summary-static {
+  cursor: default;
+}
+
+.health-node-summary::-webkit-details-marker {
+  display: none;
+}
+
+.health-node-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.health-node-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.health-node-meta {
+  font-size: 0.83rem;
+  color: #6b7280;
+}
+
+.health-node-body {
+  padding: 0 1.1rem 1.1rem;
+  color: #4b5563;
+}
+
+.health-node-line + .health-node-line {
+  margin-top: 0.45rem;
+}
+
+.health-node-data {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.health-node-data li {
+  padding: 0.45rem 0;
+  border-top: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.health-node-data li:first-child {
+  border-top: 0;
+}
+
 @media (max-width: 991.98px) {
   .hero-title {
     font-size: 1.65rem;

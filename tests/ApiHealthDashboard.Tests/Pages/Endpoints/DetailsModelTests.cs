@@ -1,4 +1,5 @@
 using ApiHealthDashboard.Configuration;
+using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Pages.Endpoints;
 using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.State;
@@ -54,10 +55,114 @@ public sealed class DetailsModelTests
         Assert.Equal("orders-api", model.Endpoint!.Id);
     }
 
-    private static DashboardConfig CreateConfig()
+    [Fact]
+    public void OnGet_WithSnapshot_LoadsDetailedDiagnostics()
+    {
+        var config = CreateConfig(showRawPayload: true);
+        config.Endpoints[0].Headers["X-Api-Key"] = "super-secret";
+        config.Endpoints[0].IncludeChecks.Add("database");
+        config.Endpoints[0].ExcludeChecks.Add("cache");
+
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        store.Upsert(new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Degraded",
+            LastCheckedUtc = new DateTimeOffset(2026, 03, 18, 8, 30, 0, TimeSpan.Zero),
+            LastSuccessfulUtc = new DateTimeOffset(2026, 03, 18, 8, 29, 0, TimeSpan.Zero),
+            DurationMs = 420,
+            LastError = "Database latency exceeded threshold.",
+            Snapshot = new HealthSnapshot
+            {
+                OverallStatus = "Degraded",
+                RetrievedUtc = new DateTimeOffset(2026, 03, 18, 8, 30, 0, TimeSpan.Zero),
+                DurationMs = 420,
+                RawPayload = "{\"status\":\"Degraded\"}",
+                Metadata = new Dictionary<string, object?>
+                {
+                    ["region"] = "sgp-1",
+                    ["statusCode"] = 200
+                },
+                Nodes =
+                [
+                    new HealthNode
+                    {
+                        Name = "database",
+                        Status = "Degraded",
+                        DurationText = "350 ms",
+                        Children =
+                        [
+                            new HealthNode
+                            {
+                                Name = "primary",
+                                Status = "Unhealthy",
+                                ErrorMessage = "Connection timeout"
+                            }
+                        ]
+                    },
+                    new HealthNode
+                    {
+                        Name = "messaging",
+                        Status = "Healthy"
+                    }
+                ]
+            }
+        });
+
+        var model = new DetailsModel(config, store, new StubEndpointScheduler(), NullLogger<DetailsModel>.Instance);
+
+        var result = model.OnGet("orders-api");
+
+        Assert.IsType<PageResult>(result);
+        Assert.NotNull(model.Endpoint);
+        Assert.Equal(2, model.Endpoint!.TopLevelCheckCount);
+        Assert.Equal(3, model.Endpoint.TotalCheckCount);
+        Assert.Equal(1, model.Endpoint.NestedCheckCount);
+        Assert.Equal(1, model.Endpoint.HealthyCheckCount);
+        Assert.Equal(1, model.Endpoint.DegradedCheckCount);
+        Assert.Equal(1, model.Endpoint.UnhealthyCheckCount);
+        Assert.Equal("********", model.Endpoint.Headers.Single().ValuePreview);
+        Assert.Equal(["database"], model.Endpoint.IncludeChecks);
+        Assert.Equal(["cache"], model.Endpoint.ExcludeChecks);
+        Assert.Equal(2, model.Endpoint.SnapshotMetadata.Count);
+        Assert.Equal("{\"status\":\"Degraded\"}", model.Endpoint.RawPayload);
+    }
+
+    [Fact]
+    public void OnGet_WhenRawPayloadIsDisabled_HidesCapturedPayload()
+    {
+        var config = CreateConfig(showRawPayload: false);
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        store.Upsert(new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Healthy",
+            Snapshot = new HealthSnapshot
+            {
+                RawPayload = "{\"status\":\"Healthy\"}"
+            }
+        });
+
+        var model = new DetailsModel(config, store, new StubEndpointScheduler(), NullLogger<DetailsModel>.Instance);
+
+        var result = model.OnGet("orders-api");
+
+        Assert.IsType<PageResult>(result);
+        Assert.NotNull(model.Endpoint);
+        Assert.False(model.Endpoint!.ShowRawPayload);
+        Assert.Null(model.Endpoint.RawPayload);
+    }
+
+    private static DashboardConfig CreateConfig(bool showRawPayload = false)
     {
         return new DashboardConfig
         {
+            Dashboard = new DashboardSettings
+            {
+                ShowRawPayload = showRawPayload
+            },
             Endpoints =
             [
                 new EndpointConfig

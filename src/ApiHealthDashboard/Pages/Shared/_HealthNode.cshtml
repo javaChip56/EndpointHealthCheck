@@ -7,46 +7,87 @@
         "Unhealthy" => "badge-danger",
         _ => "badge-secondary"
     };
+
+    var hasChildren = Model.Children.Count > 0;
 }
 
-<div class="timeline-item">
-    <h3 class="timeline-header">
-        @Model.Name
-        <span class="badge @badgeClass">@Model.Status</span>
-    </h3>
-    <div class="timeline-body">
-        @if (!string.IsNullOrWhiteSpace(Model.Description))
-        {
-            <div><strong>Description:</strong> @Model.Description</div>
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.DurationText))
-        {
-            <div><strong>Duration:</strong> @Model.DurationText</div>
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-        {
-            <div class="text-danger"><strong>Error:</strong> @Model.ErrorMessage</div>
-        }
-        @if (Model.Data.Count > 0)
-        {
-            <div class="mt-2">
-                <strong>Data</strong>
-                <ul class="mb-0 mt-1 pl-3">
-                    @foreach (var item in Model.Data.OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase))
-                    {
-                        <li><code>@item.Key</code>: @item.Value</li>
-                    }
-                </ul>
-            </div>
-        }
-        @if (Model.Children.Count > 0)
-        {
-            <div class="mt-3 nested-health-group">
+@if (hasChildren)
+{
+    <details class="health-node-card health-node-details" open>
+        <summary class="health-node-summary">
+            <span class="health-node-heading">
+                <span class="health-node-name">@Model.Name</span>
+                @if (!string.IsNullOrWhiteSpace(Model.DurationText))
+                {
+                    <span class="health-node-meta">Duration: @Model.DurationText</span>
+                }
+            </span>
+            <span class="badge @badgeClass">@Model.Status</span>
+        </summary>
+        <div class="health-node-body">
+            @if (!string.IsNullOrWhiteSpace(Model.Description))
+            {
+                <div class="health-node-line"><strong>Description:</strong> @Model.Description</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+            {
+                <div class="health-node-line text-danger"><strong>Error:</strong> @Model.ErrorMessage</div>
+            }
+            @if (Model.Data.Count > 0)
+            {
+                <div class="mt-3">
+                    <strong>Data</strong>
+                    <ul class="health-node-data mb-0 mt-2">
+                        @foreach (var item in Model.Data.OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase))
+                        {
+                            <li><code>@item.Key</code>: @item.Value</li>
+                        }
+                    </ul>
+                </div>
+            }
+            <div class="nested-health-group">
                 @foreach (var child in Model.Children)
                 {
                     <partial name="_HealthNode" model="child" />
                 }
             </div>
-        }
+        </div>
+    </details>
+}
+else
+{
+    <div class="health-node-card">
+        <div class="health-node-summary health-node-summary-static">
+            <span class="health-node-heading">
+                <span class="health-node-name">@Model.Name</span>
+                @if (!string.IsNullOrWhiteSpace(Model.DurationText))
+                {
+                    <span class="health-node-meta">Duration: @Model.DurationText</span>
+                }
+            </span>
+            <span class="badge @badgeClass">@Model.Status</span>
+        </div>
+        <div class="health-node-body">
+            @if (!string.IsNullOrWhiteSpace(Model.Description))
+            {
+                <div class="health-node-line"><strong>Description:</strong> @Model.Description</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+            {
+                <div class="health-node-line text-danger"><strong>Error:</strong> @Model.ErrorMessage</div>
+            }
+            @if (Model.Data.Count > 0)
+            {
+                <div class="mt-3">
+                    <strong>Data</strong>
+                    <ul class="health-node-data mb-0 mt-2">
+                        @foreach (var item in Model.Data.OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase))
+                        {
+                            <li><code>@item.Key</code>: @item.Value</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
     </div>
-</div>
+}

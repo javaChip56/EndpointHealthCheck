@@ -1,20 +1,22 @@
 @page "{id?}"
 @model ApiHealthDashboard.Pages.Endpoints.DetailsModel
 @{
-    ViewData["Title"] = "Endpoint Details";
     var endpoint = Model.Endpoint;
+    ViewData["Title"] = endpoint?.Name is { Length: > 0 } endpointName
+        ? endpointName
+        : "Endpoint Details";
 }
 
 <div class="content-header">
     <div class="container-fluid">
         <div class="row mb-2">
             <div class="col-sm-6">
-                <h1 class="m-0">Endpoint Details</h1>
+                <h1 class="m-0">@(endpoint?.Name ?? "Endpoint Details")</h1>
             </div>
             <div class="col-sm-6">
                 <ol class="breadcrumb float-sm-right">
                     <li class="breadcrumb-item"><a asp-page="/Index">Dashboard</a></li>
-                    <li class="breadcrumb-item active">Endpoint Details</li>
+                    <li class="breadcrumb-item active">@(endpoint?.Id ?? "Endpoint Details")</li>
                 </ol>
             </div>
         </div>
@@ -45,11 +47,88 @@ else
                 </div>
             }
 
+            <div class="card dashboard-hero mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <span class="hero-kicker">Endpoint Details</span>
+                            <h2 class="hero-title mb-2">@endpoint.Name</h2>
+                            <p class="hero-copy mb-0">@endpoint.StatusSummary</p>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="hero-panel">
+                                <div class="hero-stat">
+                                    <span class="hero-stat-label">Overall status</span>
+                                    <div class="d-flex align-items-center flex-wrap">
+                                        <span class="badge @endpoint.StatusBadgeClass mr-2">@endpoint.Status</span>
+                                        @if (endpoint.IsPolling)
+                                        {
+                                            <small class="text-white-50">Polling now</small>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="hero-stat">
+                                    <span class="hero-stat-label">Endpoint ID</span>
+                                    <strong>@endpoint.Id</strong>
+                                </div>
+                                <div class="hero-stat mb-0">
+                                    <span class="hero-stat-label">Last checked</span>
+                                    <strong>@endpoint.LastCheckedText</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(endpoint.ErrorText))
+            {
+                <div class="alert alert-warning">
+                    <strong>Current issue:</strong> @endpoint.ErrorSummary
+                </div>
+            }
+
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="small-box health-box bg-info">
+                        <div class="inner">
+                            <h3>@endpoint.TotalCheckCount</h3>
+                            <p>Total parsed checks</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="small-box health-box bg-success">
+                        <div class="inner">
+                            <h3>@endpoint.HealthyCheckCount</h3>
+                            <p>Healthy checks</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-heartbeat"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="small-box health-box bg-warning">
+                        <div class="inner">
+                            <h3>@(endpoint.DegradedCheckCount + endpoint.UnhealthyCheckCount)</h3>
+                            <p>Checks needing attention</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row">
                 <div class="col-lg-4">
                     <div class="card card-primary card-outline">
                         <div class="card-header">
-                            <h3 class="card-title">Endpoint Summary</h3>
+                            <h3 class="card-title">Endpoint Configuration</h3>
                             <div class="card-tools">
                                 <form method="post" asp-page-handler="Refresh" asp-route-id="@endpoint.Id" class="d-inline">
                                     <button type="submit" class="btn btn-tool">
@@ -73,6 +152,10 @@ else
                                     <div class="metric-value endpoint-url">@endpoint.Url</div>
                                 </div>
                                 <div class="metric-item">
+                                    <span class="metric-label">Enabled</span>
+                                    <div class="metric-value">@endpoint.EnabledText</div>
+                                </div>
+                                <div class="metric-item">
                                     <span class="metric-label">Polling Frequency</span>
                                     <div class="metric-value">@endpoint.FrequencyText</div>
                                 </div>
@@ -80,26 +163,16 @@ else
                                     <span class="metric-label">Timeout</span>
                                     <div class="metric-value">@endpoint.TimeoutText</div>
                                 </div>
-                                <div class="metric-item">
-                                    <span class="metric-label">Current Status</span>
-                                    <div class="metric-value">
-                                        <span class="badge @endpoint.StatusBadgeClass">@endpoint.Status</span>
-                                        @if (endpoint.IsPolling)
-                                        {
-                                            <small class="d-block text-info mt-1">Polling now</small>
-                                        }
-                                    </div>
-                                </div>
                             </div>
                         </div>
                         <div class="card-footer">
+                            <div class="text-muted mb-2">Configured headers</div>
                             @if (endpoint.Headers.Count == 0)
                             {
                                 <span class="text-muted">No custom request headers configured.</span>
                             }
                             else
                             {
-                                <div class="text-muted mb-1">Configured headers</div>
                                 <ul class="mb-0 pl-3">
                                     @foreach (var header in endpoint.Headers)
                                     {
@@ -115,6 +188,9 @@ else
                             <h3 class="card-title">Latest Poll Snapshot</h3>
                         </div>
                         <div class="card-body">
+                            <strong>Snapshot Retrieved</strong>
+                            <p class="text-muted">@endpoint.LastRetrievedText</p>
+                            <hr />
                             <strong>Last Checked</strong>
                             <p class="text-muted">@endpoint.LastCheckedText</p>
                             <hr />
@@ -125,7 +201,78 @@ else
                             <p class="text-muted">@endpoint.DurationText</p>
                             <hr />
                             <strong>Current Error</strong>
-                            <p class="text-muted mb-0">@(string.IsNullOrWhiteSpace(endpoint.ErrorText) ? "None" : endpoint.ErrorText)</p>
+                            <p class="text-muted mb-0">@endpoint.ErrorSummary</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Request Filters</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasFilters)
+                            {
+                                <div class="text-muted">No include or exclude filters are configured for this endpoint.</div>
+                            }
+                            else
+                            {
+                                <div class="mb-3">
+                                    <strong class="d-block mb-2">Include checks</strong>
+                                    @if (endpoint.IncludeChecks.Count == 0)
+                                    {
+                                        <span class="text-muted">All checks are included.</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="filter-chip-list">
+                                            @foreach (var checkName in endpoint.IncludeChecks)
+                                            {
+                                                <span class="badge badge-light filter-chip">@checkName</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <div>
+                                    <strong class="d-block mb-2">Exclude checks</strong>
+                                    @if (endpoint.ExcludeChecks.Count == 0)
+                                    {
+                                        <span class="text-muted">No checks are excluded.</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="filter-chip-list">
+                                            @foreach (var checkName in endpoint.ExcludeChecks)
+                                            {
+                                                <span class="badge badge-light filter-chip">@checkName</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Snapshot Metadata</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasSnapshotMetadata)
+                            {
+                                <div class="text-muted">No additional metadata was captured from the latest parsed response.</div>
+                            }
+                            else
+                            {
+                                <div class="metadata-list">
+                                    @foreach (var metadataItem in endpoint.SnapshotMetadata)
+                                    {
+                                        <div class="metadata-item">
+                                            <span class="metric-label">@metadataItem.Name</span>
+                                            <div class="metadata-value"><code>@metadataItem.Value</code></div>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
                 </div>
@@ -133,28 +280,37 @@ else
                 <div class="col-lg-8">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Nested Health Checks</h3>
+                            <h3 class="card-title">Health Checks</h3>
                         </div>
                         <div class="card-body">
-                            @if (endpoint.Nodes.Count == 0)
+                            <div class="health-check-summary">
+                                <span class="badge badge-light health-chip">Top-level: @endpoint.TopLevelCheckCount</span>
+                                <span class="badge badge-light health-chip">Nested: @endpoint.NestedCheckCount</span>
+                                <span class="badge badge-success health-chip">Healthy: @endpoint.HealthyCheckCount</span>
+                                <span class="badge badge-warning health-chip">Degraded: @endpoint.DegradedCheckCount</span>
+                                <span class="badge badge-danger health-chip">Unhealthy: @endpoint.UnhealthyCheckCount</span>
+                                <span class="badge badge-secondary health-chip">Unknown: @endpoint.UnknownCheckCount</span>
+                            </div>
+
+                            @if (!endpoint.HasParsedChecks)
                             {
-                                <div class="text-muted">No parsed health checks are available yet. Trigger a refresh to fetch the latest endpoint response.</div>
+                                <div class="dashboard-empty-state dashboard-empty-state-compact">
+                                    <div class="empty-state-icon">
+                                        <i class="fas fa-stethoscope"></i>
+                                    </div>
+                                    <div>
+                                        <h4>No parsed health checks yet</h4>
+                                        <p class="text-muted mb-0">Trigger a refresh to fetch the latest endpoint response and build the recursive health tree.</p>
+                                    </div>
+                                </div>
                             }
                             else
                             {
                                 <div class="health-tree">
-                                    <div class="timeline timeline-inverse">
-                                        @foreach (var node in endpoint.Nodes)
-                                        {
-                                            <div>
-                                                <i class="fas fa-heartbeat bg-primary"></i>
-                                                <partial name="_HealthNode" model="node" />
-                                            </div>
-                                        }
-                                        <div>
-                                            <i class="far fa-clock bg-gray"></i>
-                                        </div>
-                                    </div>
+                                    @foreach (var node in endpoint.Nodes)
+                                    {
+                                        <partial name="_HealthNode" model="node" />
+                                    }
                                 </div>
                             }
                         </div>

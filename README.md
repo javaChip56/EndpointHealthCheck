@@ -22,6 +22,7 @@ Implemented so far:
 - Phase 7: background polling scheduler and tests
 - Phase 8: manual refresh actions and page-model tests
 - Phase 9: dashboard summary view and tests
+- Phase 10: endpoint details diagnostics view and tests
 
 Not implemented yet:
 - CI/CD workflows
@@ -177,6 +178,18 @@ Current dashboard behavior:
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
 - shows a clearer empty state when no endpoints are configured
 
+### Endpoint Details
+
+The endpoint details page now acts as a diagnostic view for a single configured endpoint.
+
+Current details-page behavior:
+- shows endpoint metadata including enabled state, frequency, timeout, and masked request headers
+- shows request filter configuration for included and excluded checks
+- summarizes the latest poll with status, timings, retrieved timestamp, and current error
+- renders top-level and nested health checks recursively with native expand and collapse support
+- surfaces snapshot metadata captured from the parsed response
+- shows the raw payload section only when enabled in configuration
+
 ## Running The App
 
 From the repository root:
@@ -230,6 +243,8 @@ Current automated coverage includes:
 - dashboard page-model empty dashboard state handling
 - dashboard page-model refresh-all behavior
 - dashboard page-model refresh-single behavior
+- endpoint details page-model diagnostic summary loading
+- endpoint details raw-payload visibility rules
 - endpoint details page-model refresh behavior
 - endpoint details not-found behavior
 
@@ -261,7 +276,7 @@ Test file:
 - [x] Phase 7 - Polling scheduler
 - [x] Phase 8 - Manual refresh actions
 - [x] Phase 9 - Dashboard summary page
-- [ ] Phase 10 - Endpoint details page
+- [x] Phase 10 - Endpoint details page
 - [ ] Phase 11 - Error handling and logging
 - [ ] Phase 12 - Automated tests expansion
 - [ ] Phase 13 - Publish and deployment validation

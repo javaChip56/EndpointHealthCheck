@@ -4,6 +4,7 @@ using ApiHealthDashboard.Scheduling;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Text.Json;
 
 namespace ApiHealthDashboard.Pages.Endpoints;
 
@@ -100,6 +101,8 @@ public class DetailsModel : PageModel
 
         public required bool Enabled { get; init; }
 
+        public required string EnabledText { get; init; }
+
         public required string FrequencyText { get; init; }
 
         public required string TimeoutText { get; init; }
@@ -110,21 +113,53 @@ public class DetailsModel : PageModel
 
         public required bool IsPolling { get; init; }
 
+        public string StatusSummary { get; init; } = string.Empty;
+
         public string LastCheckedText { get; init; } = "Never";
 
         public string LastSuccessfulText { get; init; } = "Never";
+
+        public string LastRetrievedText { get; init; } = "Never";
 
         public string DurationText { get; init; } = "-";
 
         public string? ErrorText { get; init; }
 
+        public string ErrorSummary => string.IsNullOrWhiteSpace(ErrorText) ? "None" : ErrorText;
+
         public IReadOnlyList<HeaderSummaryViewModel> Headers { get; init; } = [];
 
+        public IReadOnlyList<string> IncludeChecks { get; init; } = [];
+
+        public IReadOnlyList<string> ExcludeChecks { get; init; } = [];
+
         public IReadOnlyList<HealthNode> Nodes { get; init; } = [];
+
+        public IReadOnlyList<MetadataSummaryViewModel> SnapshotMetadata { get; init; } = [];
+
+        public int TopLevelCheckCount { get; init; }
+
+        public int TotalCheckCount { get; init; }
+
+        public int NestedCheckCount { get; init; }
+
+        public int HealthyCheckCount { get; init; }
+
+        public int DegradedCheckCount { get; init; }
+
+        public int UnhealthyCheckCount { get; init; }
+
+        public int UnknownCheckCount { get; init; }
 
         public string? RawPayload { get; init; }
 
         public bool ShowRawPayload { get; init; }
+
+        public bool HasParsedChecks => Nodes.Count > 0;
+
+        public bool HasFilters => IncludeChecks.Count > 0 || ExcludeChecks.Count > 0;
+
+        public bool HasSnapshotMetadata => SnapshotMetadata.Count > 0;
 
         public static EndpointDetailsViewModel From(
             EndpointConfig endpoint,
@@ -133,6 +168,9 @@ public class DetailsModel : PageModel
         {
             var status = state?.Status ?? "Unknown";
             var timeoutSeconds = endpoint.TimeoutSeconds?.ToString() ?? "Default";
+            var nodes = state?.Snapshot?.Nodes.Select(static node => node.Clone()).ToArray() ?? [];
+            var flattenedNodes = FlattenNodes(nodes).ToArray();
+            var snapshotDurationMs = state?.DurationMs ?? state?.Snapshot?.DurationMs;
 
             return new EndpointDetailsViewModel
             {
@@ -140,14 +178,17 @@ public class DetailsModel : PageModel
                 Name = endpoint.Name,
                 Url = endpoint.Url,
                 Enabled = endpoint.Enabled,
+                EnabledText = endpoint.Enabled ? "Enabled" : "Disabled",
                 FrequencyText = $"{endpoint.FrequencySeconds} seconds",
                 TimeoutText = endpoint.TimeoutSeconds is null ? "Default timeout" : $"{timeoutSeconds} seconds",
                 Status = status,
                 StatusBadgeClass = ToBadgeClass(status),
                 IsPolling = state?.IsPolling ?? false,
+                StatusSummary = BuildStatusSummary(endpoint.Enabled, state?.IsPolling ?? false, status, state?.LastError),
                 LastCheckedText = FormatDateTime(state?.LastCheckedUtc),
                 LastSuccessfulText = FormatDateTime(state?.LastSuccessfulUtc),
-                DurationText = state?.DurationMs is long durationMs ? $"{durationMs} ms" : "-",
+                LastRetrievedText = FormatDateTime(state?.Snapshot?.RetrievedUtc),
+                DurationText = snapshotDurationMs is long durationMs ? $"{durationMs} ms" : "-",
                 ErrorText = state?.LastError,
                 Headers = endpoint.Headers
                     .OrderBy(static header => header.Key, StringComparer.OrdinalIgnoreCase)
@@ -157,15 +198,86 @@ public class DetailsModel : PageModel
                         ValuePreview = string.IsNullOrEmpty(header.Value) ? "(empty)" : "********"
                     })
                     .ToArray(),
-                Nodes = state?.Snapshot?.Nodes.Select(static node => node.Clone()).ToArray() ?? [],
+                IncludeChecks = endpoint.IncludeChecks
+                    .OrderBy(static check => check, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                ExcludeChecks = endpoint.ExcludeChecks
+                    .OrderBy(static check => check, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                Nodes = nodes,
+                SnapshotMetadata = state?.Snapshot?.Metadata
+                    .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(static item => new MetadataSummaryViewModel
+                    {
+                        Name = item.Key,
+                        Value = FormatMetadataValue(item.Value)
+                    })
+                    .ToArray() ?? [],
+                TopLevelCheckCount = nodes.Length,
+                TotalCheckCount = flattenedNodes.Length,
+                NestedCheckCount = Math.Max(flattenedNodes.Length - nodes.Length, 0),
+                HealthyCheckCount = flattenedNodes.Count(static node => node.Status == "Healthy"),
+                DegradedCheckCount = flattenedNodes.Count(static node => node.Status == "Degraded"),
+                UnhealthyCheckCount = flattenedNodes.Count(static node => node.Status == "Unhealthy"),
+                UnknownCheckCount = flattenedNodes.Count(static node => node.Status is not ("Healthy" or "Degraded" or "Unhealthy")),
                 RawPayload = showRawPayload ? state?.Snapshot?.RawPayload : null,
                 ShowRawPayload = showRawPayload
             };
         }
 
+        private static IEnumerable<HealthNode> FlattenNodes(IEnumerable<HealthNode> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                yield return node;
+
+                foreach (var child in FlattenNodes(node.Children))
+                {
+                    yield return child;
+                }
+            }
+        }
+
         private static string FormatDateTime(DateTimeOffset? value)
         {
             return value?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'") ?? "Never";
+        }
+
+        private static string BuildStatusSummary(bool enabled, bool isPolling, string status, string? errorText)
+        {
+            if (!enabled)
+            {
+                return "Polling is disabled for this endpoint in YAML configuration.";
+            }
+
+            if (isPolling)
+            {
+                return "A refresh is currently in progress for this endpoint.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(errorText))
+            {
+                return "The latest poll completed with an error that needs attention.";
+            }
+
+            return status switch
+            {
+                "Healthy" => "The latest poll completed successfully and all reported checks are healthy.",
+                "Degraded" => "The latest poll completed, but one or more checks reported a degraded state.",
+                "Unhealthy" => "The latest poll completed and at least one reported check is unhealthy.",
+                _ => "No successful health snapshot has been captured yet."
+            };
+        }
+
+        private static string FormatMetadataValue(object? value)
+        {
+            return value switch
+            {
+                null => "(null)",
+                string text when string.IsNullOrWhiteSpace(text) => "(empty)",
+                string text => text,
+                _ => JsonSerializer.Serialize(value)
+            };
         }
 
         private static string ToBadgeClass(string status)
@@ -185,5 +297,12 @@ public class DetailsModel : PageModel
         public required string Name { get; init; }
 
         public required string ValuePreview { get; init; }
+    }
+
+    public sealed class MetadataSummaryViewModel
+    {
+        public required string Name { get; init; }
+
+        public required string Value { get; init; }
     }
 }
