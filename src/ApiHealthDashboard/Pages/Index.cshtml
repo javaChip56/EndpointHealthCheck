@@ -37,7 +37,7 @@
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-lg-8">
-                        <span class="hero-kicker">Phase 9 Summary View</span>
+                        <span class="hero-kicker">Live Summary</span>
                         <h2 class="hero-title">Operational overview of monitored endpoint health</h2>
                         <p class="hero-copy mb-0">
                             This dashboard summarizes the live runtime state for configured endpoints, including the latest status,
@@ -116,8 +116,23 @@
                 <div class="card">
                     <div class="card-header border-0">
                         <h3 class="card-title">Endpoint Summary</h3>
-                        <div class="card-tools">
-                            <form method="post" asp-page-handler="RefreshAll" class="d-inline">
+                        <div class="card-tools dashboard-card-tools">
+                            <div class="endpoint-search-tools">
+                                <div class="input-group input-group-sm endpoint-search-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-search"></i>
+                                        </span>
+                                    </div>
+                                    <input type="search"
+                                           class="form-control"
+                                           placeholder="Search name, id, status, or error"
+                                           aria-label="Search endpoints"
+                                           data-endpoint-search-input />
+                                </div>
+                                <small class="text-muted endpoint-search-count" data-endpoint-search-count></small>
+                            </div>
+                            <form method="post" asp-page-handler="RefreshAll" class="dashboard-refresh-all-form">
                                 <button type="submit" class="btn btn-tool">
                                     <i class="fas fa-sync-alt mr-1"></i>Refresh All
                                 </button>
@@ -133,7 +148,7 @@
                                 </div>
                                 <h3>No endpoints configured yet</h3>
                                 <p class="text-muted mb-0">
-                                    Add one or more endpoints to <code>endpoints.yaml</code> and restart the app to begin monitoring.
+                                    Add endpoint YAML files to your configured dashboard setup and restart the app to begin monitoring.
                                 </p>
                             </div>
                         }
@@ -155,7 +170,18 @@
                                 <tbody>
                                     @foreach (var endpoint in Model.Endpoints)
                                     {
-                                        <tr>
+                                        var searchText = string.Join(
+                                            ' ',
+                                            new[]
+                                            {
+                                                endpoint.Name,
+                                                endpoint.Id,
+                                                endpoint.Status,
+                                                endpoint.StatusDescription,
+                                                endpoint.ErrorSummary
+                                            }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+
+                                        <tr data-endpoint-search-row data-endpoint-search-text="@searchText">
                                             <td>
                                                 <div class="font-weight-semibold">@endpoint.Name</div>
                                                 <small class="text-muted">@endpoint.Id</small>
@@ -193,6 +219,11 @@
                                             </td>
                                         </tr>
                                     }
+                                    <tr data-endpoint-search-empty hidden>
+                                        <td colspan="8" class="text-center text-muted py-4">
+                                            No endpoints match your search.
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         }

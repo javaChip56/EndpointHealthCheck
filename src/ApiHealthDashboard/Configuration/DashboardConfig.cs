@@ -4,6 +4,8 @@ public sealed class DashboardConfig
 {
     public DashboardSettings Dashboard { get; set; } = new();
 
+    public List<string> EndpointFiles { get; set; } = new();
+
     public List<EndpointConfig> Endpoints { get; set; } = new();
 }
 

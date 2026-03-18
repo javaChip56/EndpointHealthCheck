@@ -11,8 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="endpoints.yaml" />
-    <Content Include="endpoints.yaml">
+    <None Remove="**\*.yaml" />
+    <Content Include="**\*.yaml" Exclude="bin\**;obj\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

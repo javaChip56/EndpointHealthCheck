@@ -191,6 +191,69 @@ public sealed class YamlConfigLoaderTests : IDisposable
         Assert.Contains("Failed to parse YAML", exception.Errors.Single(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Load_WithSeparateEndpointFiles_LoadsAndMergesEndpoints()
+    {
+        WriteNamedConfig(
+            "endpoints/orders-api.yaml",
+            """
+            id: orders-api
+            name: Orders API
+            url: https://orders.example.com/health
+            frequencySeconds: 30
+            """);
+
+        WriteNamedConfig(
+            "endpoints/services.yaml",
+            """
+            endpoints:
+              - id: billing-api
+                name: Billing API
+                url: https://billing.example.com/health
+                frequencySeconds: 60
+              - id: notifications-api
+                name: Notifications API
+                url: https://notifications.example.com/health
+                frequencySeconds: 45
+            """);
+
+        var dashboardConfigPath = WriteNamedConfig(
+            "dashboard.yaml",
+            """
+            dashboard:
+              refreshUiSeconds: 20
+              requestTimeoutSecondsDefault: 15
+            endpointFiles:
+              - endpoints/orders-api.yaml
+              - endpoints/services.yaml
+            """);
+
+        var config = _loader.Load(dashboardConfigPath);
+
+        Assert.Equal(20, config.Dashboard.RefreshUiSeconds);
+        Assert.Equal(15, config.Dashboard.RequestTimeoutSecondsDefault);
+        Assert.Equal(2, config.EndpointFiles.Count);
+        Assert.Equal(3, config.Endpoints.Count);
+        Assert.Contains(config.Endpoints, static endpoint => endpoint.Id == "orders-api");
+        Assert.Contains(config.Endpoints, static endpoint => endpoint.Id == "billing-api");
+        Assert.Contains(config.Endpoints, static endpoint => endpoint.Id == "notifications-api");
+    }
+
+    [Fact]
+    public void Load_WithMissingEndpointFile_ThrowsHelpfulError()
+    {
+        var dashboardConfigPath = WriteNamedConfig(
+            "dashboard.yaml",
+            """
+            endpointFiles:
+              - endpoints/missing.yaml
+            """);
+
+        var exception = Assert.Throws<DashboardConfigurationException>(() => _loader.Load(dashboardConfigPath));
+
+        Assert.Contains("missing.yaml", exception.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))
@@ -202,6 +265,14 @@ public sealed class YamlConfigLoaderTests : IDisposable
     private string WriteConfig(string content)
     {
         var path = Path.Combine(_tempDirectory, $"{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    private string WriteNamedConfig(string relativePath, string content)
+    {
+        var path = Path.Combine(_tempDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
         return path;
     }

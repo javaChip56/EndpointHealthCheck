@@ -22,33 +22,46 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        if (!File.Exists(path))
+        var dashboardConfig = DeserializeDashboardConfig(path);
+        Normalize(dashboardConfig);
+
+        var mergedConfig = new DashboardConfig
         {
-            throw new DashboardConfigurationException(
-                path,
-                [$"Configuration file '{path}' was not found."]);
+            Dashboard = dashboardConfig.Dashboard,
+            EndpointFiles = new List<string>(dashboardConfig.EndpointFiles),
+            Endpoints = dashboardConfig.Endpoints
+                .Select(CloneEndpoint)
+                .ToList()
+        };
+
+        var dashboardDirectory = Path.GetDirectoryName(Path.GetFullPath(path)) ?? Directory.GetCurrentDirectory();
+
+        foreach (var endpointFilePath in dashboardConfig.EndpointFiles)
+        {
+            var resolvedEndpointFilePath = ResolveConfigPath(endpointFilePath, dashboardDirectory);
+            var fileEndpoints = LoadEndpointsFromFile(resolvedEndpointFilePath);
+            mergedConfig.Endpoints.AddRange(fileEndpoints);
         }
 
-        string yaml;
+        Normalize(mergedConfig);
 
-        try
+        var errors = _validator.Validate(mergedConfig);
+        if (errors.Count > 0)
         {
-            yaml = File.ReadAllText(path);
-        }
-        catch (Exception ex)
-        {
-            throw new DashboardConfigurationException(
-                path,
-                [$"Unable to read configuration file '{path}'."],
-                ex);
+            throw new DashboardConfigurationException(path, errors);
         }
 
-        DashboardConfig config;
+        return mergedConfig;
+    }
+
+    private DashboardConfig DeserializeDashboardConfig(string path)
+    {
+        var yaml = ReadYaml(path);
 
         try
         {
             var expandedYaml = ReplaceEnvironmentTokens(yaml);
-            config = _deserializer.Deserialize<DashboardConfig>(expandedYaml) ?? new DashboardConfig();
+            return _deserializer.Deserialize<DashboardConfig>(expandedYaml) ?? new DashboardConfig();
         }
         catch (YamlException ex)
         {
@@ -57,26 +70,117 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
                 [$"Failed to parse YAML at line {ex.Start.Line}, column {ex.Start.Column}: {ex.Message}"],
                 ex);
         }
+    }
 
-        Normalize(config);
+    private List<EndpointConfig> LoadEndpointsFromFile(string path)
+    {
+        var yaml = ReadYaml(path);
 
-        var errors = _validator.Validate(config);
-        if (errors.Count > 0)
+        try
         {
-            throw new DashboardConfigurationException(path, errors);
+            var expandedYaml = ReplaceEnvironmentTokens(yaml);
+            var endpoints = new List<EndpointConfig>();
+            YamlException? parseException = null;
+
+            try
+            {
+                var endpointFile = _deserializer.Deserialize<EndpointFileDocument>(expandedYaml) ?? new EndpointFileDocument();
+                if (endpointFile.Endpoints.Count > 0)
+                {
+                    endpoints = endpointFile.Endpoints;
+                }
+            }
+            catch (YamlException ex)
+            {
+                parseException = ex;
+            }
+
+            if (endpoints.Count == 0)
+            {
+                try
+                {
+                    var singleEndpoint = _deserializer.Deserialize<EndpointConfig>(expandedYaml);
+                    if (HasEndpointContent(singleEndpoint))
+                    {
+                        endpoints = [singleEndpoint!];
+                    }
+                }
+                catch (YamlException ex)
+                {
+                    parseException ??= ex;
+                }
+            }
+
+            NormalizeEndpoints(endpoints);
+
+            if (endpoints.Count == 0)
+            {
+                if (parseException is not null)
+                {
+                    throw new DashboardConfigurationException(
+                        path,
+                        [$"Failed to parse YAML at line {parseException.Start.Line}, column {parseException.Start.Column}: {parseException.Message}"],
+                        parseException);
+                }
+
+                throw new DashboardConfigurationException(path, [$"Endpoint file '{path}' did not contain any endpoint definitions."]);
+            }
+
+            return endpoints;
+        }
+        catch (DashboardConfigurationException)
+        {
+            throw;
+        }
+        catch (YamlException ex)
+        {
+            throw new DashboardConfigurationException(
+                path,
+                [$"Failed to parse YAML at line {ex.Start.Line}, column {ex.Start.Column}: {ex.Message}"],
+                ex);
+        }
+    }
+
+    private static string ReadYaml(string path)
+    {
+        if (!File.Exists(path))
+        {
+            throw new DashboardConfigurationException(
+                path,
+                [$"Configuration file '{path}' was not found."]);
         }
 
-        return config;
+        try
+        {
+            return File.ReadAllText(path);
+        }
+        catch (Exception ex)
+        {
+            throw new DashboardConfigurationException(
+                path,
+                [$"Unable to read configuration file '{path}'."],
+                ex);
+        }
     }
 
     private static void Normalize(DashboardConfig config)
     {
         config.Dashboard ??= new DashboardSettings();
+        config.EndpointFiles = NormalizeFileList(config.EndpointFiles);
         config.Endpoints ??= new List<EndpointConfig>();
+        NormalizeEndpoints(config.Endpoints);
+    }
 
-        for (var index = 0; index < config.Endpoints.Count; index++)
+    private static void NormalizeEndpoints(List<EndpointConfig>? endpoints)
+    {
+        if (endpoints is null)
         {
-            var endpoint = config.Endpoints[index] ?? new EndpointConfig();
+            return;
+        }
+
+        for (var index = 0; index < endpoints.Count; index++)
+        {
+            var endpoint = endpoints[index] ?? new EndpointConfig();
 
             endpoint.Id = endpoint.Id?.Trim() ?? string.Empty;
             endpoint.Name = endpoint.Name?.Trim() ?? string.Empty;
@@ -87,8 +191,21 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
             endpoint.IncludeChecks = NormalizeCheckList(endpoint.IncludeChecks);
             endpoint.ExcludeChecks = NormalizeCheckList(endpoint.ExcludeChecks);
 
-            config.Endpoints[index] = endpoint;
+            endpoints[index] = endpoint;
         }
+    }
+
+    private static List<string> NormalizeFileList(List<string>? values)
+    {
+        if (values is null)
+        {
+            return new List<string>();
+        }
+
+        return values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .ToList();
     }
 
     private static List<string> NormalizeCheckList(List<string>? values)
@@ -113,6 +230,48 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
                 var variableName = match.Groups["name"].Value;
                 return Environment.GetEnvironmentVariable(variableName) ?? match.Value;
             });
+    }
+
+    private static string ResolveConfigPath(string configuredPath, string baseDirectory)
+    {
+        return Path.IsPathRooted(configuredPath)
+            ? Path.GetFullPath(configuredPath)
+            : Path.GetFullPath(Path.Combine(baseDirectory, configuredPath));
+    }
+
+    private static bool HasEndpointContent(EndpointConfig? endpoint)
+    {
+        return endpoint is not null &&
+               (!string.IsNullOrWhiteSpace(endpoint.Id) ||
+                !string.IsNullOrWhiteSpace(endpoint.Name) ||
+                !string.IsNullOrWhiteSpace(endpoint.Url) ||
+                endpoint.TimeoutSeconds is not null ||
+                endpoint.Headers.Count > 0 ||
+                endpoint.IncludeChecks.Count > 0 ||
+                endpoint.ExcludeChecks.Count > 0 ||
+                endpoint.Enabled != true ||
+                endpoint.FrequencySeconds != 30);
+    }
+
+    private static EndpointConfig CloneEndpoint(EndpointConfig endpoint)
+    {
+        return new EndpointConfig
+        {
+            Id = endpoint.Id,
+            Name = endpoint.Name,
+            Url = endpoint.Url,
+            Enabled = endpoint.Enabled,
+            FrequencySeconds = endpoint.FrequencySeconds,
+            TimeoutSeconds = endpoint.TimeoutSeconds,
+            Headers = new Dictionary<string, string>(endpoint.Headers, StringComparer.OrdinalIgnoreCase),
+            IncludeChecks = [.. endpoint.IncludeChecks],
+            ExcludeChecks = [.. endpoint.ExcludeChecks]
+        };
+    }
+
+    private sealed class EndpointFileDocument
+    {
+        public List<EndpointConfig> Endpoints { get; set; } = new();
     }
 
     [GeneratedRegex(@"\$\{(?<name>[A-Za-z_][A-Za-z0-9_]*)\}", RegexOptions.Compiled)]

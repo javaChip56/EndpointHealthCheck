@@ -22,7 +22,7 @@ builder.Services.AddSingleton(static serviceProvider =>
     var logger = serviceProvider.GetRequiredService<ILoggerFactory>()
         .CreateLogger("ApiHealthDashboard.Configuration");
 
-    var resolvedPath = ResolveConfigPath(options.EndpointsConfigPath, environment.ContentRootPath);
+    var resolvedPath = ResolveConfigPath(options.ResolveDashboardConfigPath(), environment.ContentRootPath);
     logger.LogInformation(
         "Loading dashboard configuration from {ConfigPath}.",
         resolvedPath);

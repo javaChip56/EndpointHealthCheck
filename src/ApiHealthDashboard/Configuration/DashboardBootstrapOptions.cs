@@ -4,5 +4,14 @@ public sealed class DashboardBootstrapOptions
 {
     public const string SectionName = "Bootstrap";
 
-    public string EndpointsConfigPath { get; set; } = "endpoints.yaml";
+    public string DashboardConfigPath { get; set; } = "dashboard.yaml";
+
+    public string? EndpointsConfigPath { get; set; }
+
+    public string ResolveDashboardConfigPath()
+    {
+        return !string.IsNullOrWhiteSpace(DashboardConfigPath)
+            ? DashboardConfigPath
+            : EndpointsConfigPath ?? "dashboard.yaml";
+    }
 }

@@ -1,0 +1,8 @@
+dashboard:
+  refreshUiSeconds: 10
+  requestTimeoutSecondsDefault: 10
+  showRawPayload: true
+
+endpointFiles:
+  - endpoints/orders-api.yaml
+  - endpoints/billing-api.yaml
