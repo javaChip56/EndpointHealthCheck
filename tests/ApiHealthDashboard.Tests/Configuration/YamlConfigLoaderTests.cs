@@ -269,6 +269,50 @@ public sealed class YamlConfigLoaderTests : IDisposable
         Assert.Single(result.Config.Endpoints);
         Assert.Equal("orders-api", result.Config.Endpoints[0].Id);
         Assert.Contains("missing.yaml", result.Warnings.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(result.WatchedFilePaths, path => path.EndsWith("dashboard.yaml", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.WatchedFilePaths, path => path.EndsWith("missing.yaml", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LoadSelectedEndpoints_WithSpecificFiles_LoadsOnlyThoseEndpoints()
+    {
+        WriteNamedConfig(
+            "endpoints/orders-api.yaml",
+            """
+            id: orders-api
+            name: Orders API
+            url: https://orders.example.com/health
+            frequencySeconds: 30
+            """);
+
+        WriteNamedConfig(
+            "endpoints/billing-api.yaml",
+            """
+            id: billing-api
+            name: Billing API
+            url: https://billing.example.com/health
+            frequencySeconds: 60
+            """);
+
+        var dashboardConfigPath = WriteNamedConfig(
+            "dashboard.yaml",
+            """
+            dashboard:
+              refreshUiSeconds: 25
+              requestTimeoutSecondsDefault: 14
+            endpointFiles:
+              - endpoints/orders-api.yaml
+              - endpoints/billing-api.yaml
+            """);
+
+        var result = _loader.LoadSelectedEndpoints(dashboardConfigPath, ["endpoints/billing-api.yaml"]);
+
+        Assert.Single(result.Config.Endpoints);
+        Assert.Equal("billing-api", result.Config.Endpoints[0].Id);
+        Assert.Equal(25, result.Config.Dashboard.RefreshUiSeconds);
+        Assert.Equal(14, result.Config.Dashboard.RequestTimeoutSecondsDefault);
+        Assert.Equal(Path.Combine(_tempDirectory, "endpoints", "billing-api.yaml"), result.Config.EndpointFiles[0]);
+        Assert.Empty(result.Warnings);
     }
 
     public void Dispose()

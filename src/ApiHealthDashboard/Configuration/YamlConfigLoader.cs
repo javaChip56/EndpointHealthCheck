@@ -21,6 +21,7 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
     public DashboardConfigLoadResult Load(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var watchedFilePaths = new List<string> { Path.GetFullPath(path) };
 
         if (!File.Exists(path))
         {
@@ -30,7 +31,8 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
                 Warnings =
                 [
                     $"Dashboard configuration file '{path}' was not found. The dashboard started with no configured endpoints."
-                ]
+                ],
+                WatchedFilePaths = watchedFilePaths
             };
         }
 
@@ -52,6 +54,7 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
         foreach (var endpointFilePath in dashboardConfig.EndpointFiles)
         {
             var resolvedEndpointFilePath = ResolveConfigPath(endpointFilePath, dashboardDirectory);
+            watchedFilePaths.Add(resolvedEndpointFilePath);
             if (!File.Exists(resolvedEndpointFilePath))
             {
                 warnings.Add($"Endpoint configuration file '{resolvedEndpointFilePath}' was not found. It was skipped.");
@@ -73,7 +76,75 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
         return new DashboardConfigLoadResult
         {
             Config = mergedConfig,
-            Warnings = warnings
+            Warnings = warnings,
+            WatchedFilePaths = watchedFilePaths
+        };
+    }
+
+    public DashboardConfigLoadResult LoadSelectedEndpoints(string dashboardPath, IEnumerable<string> endpointFilePaths)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dashboardPath);
+        ArgumentNullException.ThrowIfNull(endpointFilePaths);
+
+        var normalizedFiles = NormalizeFileList([.. endpointFilePaths]);
+        var warnings = new List<string>();
+        var watchedFilePaths = new List<string> { Path.GetFullPath(dashboardPath) };
+        DashboardSettings dashboardSettings;
+        string dashboardDirectory;
+
+        if (!File.Exists(dashboardPath))
+        {
+            dashboardSettings = new DashboardSettings();
+            dashboardDirectory = Path.GetDirectoryName(Path.GetFullPath(dashboardPath)) ?? Directory.GetCurrentDirectory();
+            warnings.Add(
+                $"Dashboard configuration file '{dashboardPath}' was not found. Default dashboard settings were used for CLI execution.");
+        }
+        else
+        {
+            var dashboardConfig = DeserializeDashboardConfig(dashboardPath);
+            Normalize(dashboardConfig);
+            dashboardSettings = dashboardConfig.Dashboard;
+            dashboardDirectory = Path.GetDirectoryName(Path.GetFullPath(dashboardPath)) ?? Directory.GetCurrentDirectory();
+        }
+
+        var resolvedFiles = new List<string>();
+        var endpoints = new List<EndpointConfig>();
+
+        foreach (var endpointFilePath in normalizedFiles)
+        {
+            var resolvedEndpointFilePath = ResolveConfigPath(endpointFilePath, dashboardDirectory);
+            watchedFilePaths.Add(resolvedEndpointFilePath);
+            resolvedFiles.Add(resolvedEndpointFilePath);
+
+            if (!File.Exists(resolvedEndpointFilePath))
+            {
+                warnings.Add($"Endpoint configuration file '{resolvedEndpointFilePath}' was not found. It was skipped.");
+                continue;
+            }
+
+            endpoints.AddRange(LoadEndpointsFromFile(resolvedEndpointFilePath));
+        }
+
+        var mergedConfig = new DashboardConfig
+        {
+            Dashboard = dashboardSettings,
+            EndpointFiles = resolvedFiles,
+            Endpoints = endpoints
+        };
+
+        Normalize(mergedConfig);
+
+        var errors = _validator.Validate(mergedConfig);
+        if (errors.Count > 0)
+        {
+            throw new DashboardConfigurationException(dashboardPath, errors);
+        }
+
+        return new DashboardConfigLoadResult
+        {
+            Config = mergedConfig,
+            Warnings = warnings,
+            WatchedFilePaths = watchedFilePaths
         };
     }
 
@@ -278,18 +349,7 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
 
     private static EndpointConfig CloneEndpoint(EndpointConfig endpoint)
     {
-        return new EndpointConfig
-        {
-            Id = endpoint.Id,
-            Name = endpoint.Name,
-            Url = endpoint.Url,
-            Enabled = endpoint.Enabled,
-            FrequencySeconds = endpoint.FrequencySeconds,
-            TimeoutSeconds = endpoint.TimeoutSeconds,
-            Headers = new Dictionary<string, string>(endpoint.Headers, StringComparer.OrdinalIgnoreCase),
-            IncludeChecks = [.. endpoint.IncludeChecks],
-            ExcludeChecks = [.. endpoint.ExcludeChecks]
-        };
+        return endpoint.Clone();
     }
 
     private sealed class EndpointFileDocument

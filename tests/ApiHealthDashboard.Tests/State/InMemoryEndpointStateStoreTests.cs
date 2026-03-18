@@ -99,6 +99,32 @@ public sealed class InMemoryEndpointStateStoreTests
     }
 
     [Fact]
+    public void Initialize_PreservesExistingRuntimeStateForMatchingEndpointIds()
+    {
+        var store = new InMemoryEndpointStateStore(
+            [new EndpointConfig { Id = "orders-api", Name = "Orders API", Url = "https://orders.example.com/health" }]);
+
+        store.Upsert(new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Healthy",
+            LastError = "none"
+        });
+
+        store.Initialize(
+            [
+                new EndpointConfig { Id = "orders-api", Name = "Orders API Reloaded", Url = "https://orders.example.com/health" }
+            ]);
+
+        var state = store.Get("orders-api");
+        Assert.NotNull(state);
+        Assert.Equal("Healthy", state!.Status);
+        Assert.Equal("Orders API Reloaded", state.EndpointName);
+        Assert.Equal("none", state.LastError);
+    }
+
+    [Fact]
     public async Task Upsert_AllowsConcurrentUpdatesWithoutCorruptingTheStore()
     {
         var store = new InMemoryEndpointStateStore(

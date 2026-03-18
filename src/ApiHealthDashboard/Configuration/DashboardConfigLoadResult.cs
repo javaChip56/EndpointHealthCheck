@@ -5,4 +5,6 @@ public sealed class DashboardConfigLoadResult
     public required DashboardConfig Config { get; init; }
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public IReadOnlyList<string> WatchedFilePaths { get; init; } = [];
 }

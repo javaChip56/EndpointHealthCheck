@@ -12,13 +12,16 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
     private const string ScheduledTriggerSource = "scheduled";
 
     private readonly DashboardConfig _dashboardConfig;
-    private readonly Dictionary<string, EndpointConfig> _endpointsById;
-    private readonly Dictionary<string, SemaphoreSlim> _endpointLocks;
     private readonly IEndpointPoller _endpointPoller;
     private readonly IHealthResponseParser _healthResponseParser;
     private readonly ILogger<PollingSchedulerService> _logger;
     private readonly IEndpointStateStore _stateStore;
     private readonly TimeProvider _timeProvider;
+    private readonly object _syncRoot = new();
+    private readonly Dictionary<string, EndpointLoopRegistration> _loopRegistrations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SemaphoreSlim> _endpointLocks = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationToken _serviceCancellationToken;
+    private bool _started;
 
     public PollingSchedulerService(
         DashboardConfig dashboardConfig,
@@ -34,38 +37,43 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         _healthResponseParser = healthResponseParser;
         _timeProvider = timeProvider;
         _logger = logger;
-        _endpointsById = dashboardConfig.Endpoints.ToDictionary(
-            static endpoint => endpoint.Id,
-            StringComparer.OrdinalIgnoreCase);
-        _endpointLocks = dashboardConfig.Endpoints.ToDictionary(
-            static endpoint => endpoint.Id,
-            static _ => new SemaphoreSlim(1, 1),
-            StringComparer.OrdinalIgnoreCase);
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var tasks = _dashboardConfig.Endpoints
-            .Where(static endpoint => endpoint.Enabled)
-            .Select(endpoint => RunEndpointLoopAsync(endpoint, stoppingToken))
-            .ToArray();
-
         _logger.LogInformation(
             "Starting polling scheduler for {EnabledEndpointCount} enabled endpoints out of {TotalEndpointCount} configured endpoints.",
-            tasks.Length,
+            _dashboardConfig.Endpoints.Count(static endpoint => endpoint.Enabled),
             _dashboardConfig.Endpoints.Count);
 
-        return tasks.Length == 0
-            ? Task.CompletedTask
-            : Task.WhenAll(tasks);
+        lock (_syncRoot)
+        {
+            _serviceCancellationToken = stoppingToken;
+            _started = true;
+        }
+
+        await ApplyCurrentConfigurationAsync(stoppingToken);
+
+        try
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            await StopAllLoopsAsync();
+        }
     }
 
     public async Task<bool> RefreshEndpointAsync(string endpointId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointId);
 
-        if (!_endpointsById.TryGetValue(endpointId, out var endpoint) ||
-            !_endpointLocks.TryGetValue(endpointId, out var endpointLock))
+        var endpoint = GetEndpoint(endpointId);
+        var endpointLock = GetOrCreateEndpointLock(endpointId);
+        if (endpoint is null)
         {
             return false;
         }
@@ -113,6 +121,22 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         return results.Count(static result => result);
     }
 
+    public async Task ReloadConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Reloading polling scheduler for {EnabledEndpointCount} enabled endpoints out of {TotalEndpointCount} configured endpoints.",
+            _dashboardConfig.Endpoints.Count(static endpoint => endpoint.Enabled),
+            _dashboardConfig.Endpoints.Count);
+
+        if (!_started)
+        {
+            _stateStore.Initialize(_dashboardConfig.Endpoints);
+            return;
+        }
+
+        await ApplyCurrentConfigurationAsync(cancellationToken);
+    }
+
     private async Task RunEndpointLoopAsync(EndpointConfig endpoint, CancellationToken cancellationToken)
     {
         var interval = TimeSpan.FromSeconds(endpoint.FrequencySeconds);
@@ -123,14 +147,7 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             {
                 await Task.Delay(interval, _timeProvider, cancellationToken);
 
-                if (!_endpointLocks.TryGetValue(endpoint.Id, out var endpointLock))
-                {
-                    _logger.LogWarning(
-                        "Skipping scheduled poll for endpoint {EndpointId} because no endpoint lock was configured.",
-                        endpoint.Id);
-                    continue;
-                }
-
+                var endpointLock = GetOrCreateEndpointLock(endpoint.Id);
                 var lockAcquired = false;
 
                 try
@@ -256,4 +273,109 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         parserError = string.Empty;
         return false;
     }
+
+    private EndpointConfig? GetEndpoint(string endpointId)
+    {
+        return _dashboardConfig.Endpoints.FirstOrDefault(
+            endpoint => string.Equals(endpoint.Id, endpointId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private SemaphoreSlim GetOrCreateEndpointLock(string endpointId)
+    {
+        lock (_syncRoot)
+        {
+            if (_endpointLocks.TryGetValue(endpointId, out var existingLock))
+            {
+                return existingLock;
+            }
+
+            var endpointLock = new SemaphoreSlim(1, 1);
+            _endpointLocks[endpointId] = endpointLock;
+            return endpointLock;
+        }
+    }
+
+    private async Task ApplyCurrentConfigurationAsync(CancellationToken cancellationToken)
+    {
+        EndpointLoopRegistration[] previousRegistrations;
+        List<EndpointConfig> enabledEndpoints;
+        CancellationToken serviceToken;
+
+        lock (_syncRoot)
+        {
+            previousRegistrations = _loopRegistrations.Values.ToArray();
+            _loopRegistrations.Clear();
+            enabledEndpoints = _dashboardConfig.Endpoints
+                .Where(static endpoint => endpoint.Enabled)
+                .Select(static endpoint => endpoint.Clone())
+                .ToList();
+            serviceToken = _serviceCancellationToken;
+        }
+
+        foreach (var registration in previousRegistrations)
+        {
+            registration.CancellationTokenSource.Cancel();
+        }
+
+        if (previousRegistrations.Length > 0)
+        {
+            try
+            {
+                await Task.WhenAll(previousRegistrations.Select(static registration => registration.Task));
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _stateStore.Initialize(_dashboardConfig.Endpoints);
+
+        foreach (var endpoint in enabledEndpoints)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var loopCts = CancellationTokenSource.CreateLinkedTokenSource(serviceToken);
+            var loopTask = RunEndpointLoopAsync(endpoint, loopCts.Token);
+
+            lock (_syncRoot)
+            {
+                _endpointLocks[endpoint.Id] = GetOrCreateEndpointLock(endpoint.Id);
+                _loopRegistrations[endpoint.Id] = new EndpointLoopRegistration(loopCts, loopTask);
+            }
+        }
+    }
+
+    private async Task StopAllLoopsAsync()
+    {
+        EndpointLoopRegistration[] registrations;
+
+        lock (_syncRoot)
+        {
+            registrations = _loopRegistrations.Values.ToArray();
+            _loopRegistrations.Clear();
+            _started = false;
+        }
+
+        foreach (var registration in registrations)
+        {
+            registration.CancellationTokenSource.Cancel();
+        }
+
+        if (registrations.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.WhenAll(registrations.Select(static registration => registration.Task));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private sealed record EndpointLoopRegistration(
+        CancellationTokenSource CancellationTokenSource,
+        Task Task);
 }
