@@ -36,6 +36,7 @@ public class DetailsModel : PageModel
         var endpointId = ResolveEndpointId(id);
         if (endpointId is null)
         {
+            _logger.LogWarning("Endpoint details were requested, but no endpoint id could be resolved.");
             return NotFound();
         }
 
@@ -49,10 +50,20 @@ public class DetailsModel : PageModel
         var endpointId = ResolveEndpointId(id);
         if (endpointId is null)
         {
+            _logger.LogWarning("Manual refresh was requested from the details page, but no endpoint id could be resolved.");
             return NotFound();
         }
 
+        _logger.LogInformation(
+            "Manual refresh requested from the details page for endpoint {EndpointId}.",
+            endpointId);
+
         var refreshed = await _scheduler.RefreshEndpointAsync(endpointId, cancellationToken);
+
+        _logger.LogInformation(
+            "Manual refresh requested from the details page for endpoint {EndpointId} completed with outcome {RefreshStarted}.",
+            endpointId,
+            refreshed);
 
         TempData["StatusMessage"] = refreshed
             ? $"Triggered refresh for endpoint '{endpointId}'."
@@ -79,6 +90,9 @@ public class DetailsModel : PageModel
 
         if (endpointConfig is null)
         {
+            _logger.LogWarning(
+                "Endpoint details were requested for unknown endpoint {EndpointId}.",
+                endpointId);
             return false;
         }
 

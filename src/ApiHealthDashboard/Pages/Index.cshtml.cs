@@ -41,7 +41,13 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostRefreshAllAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Manual refresh requested for all enabled endpoints.");
+
         var refreshedCount = await _scheduler.RefreshAllEnabledAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Manual refresh request for all enabled endpoints started {RefreshedCount} refresh operation(s).",
+            refreshedCount);
 
         TempData["StatusMessage"] = refreshedCount > 0
             ? $"Triggered refresh for {refreshedCount} enabled endpoint(s)."
@@ -55,12 +61,22 @@ public class IndexModel : PageModel
     {
         if (string.IsNullOrWhiteSpace(endpointId))
         {
+            _logger.LogWarning("Manual refresh requested on the dashboard without an endpoint id.");
             TempData["StatusMessage"] = "No endpoint was selected for refresh.";
             TempData["StatusType"] = "warning";
             return RedirectToPage();
         }
 
+        _logger.LogInformation(
+            "Manual refresh requested on the dashboard for endpoint {EndpointId}.",
+            endpointId);
+
         var refreshed = await _scheduler.RefreshEndpointAsync(endpointId, cancellationToken);
+
+        _logger.LogInformation(
+            "Manual refresh requested on the dashboard for endpoint {EndpointId} completed with outcome {RefreshStarted}.",
+            endpointId,
+            refreshed);
 
         TempData["StatusMessage"] = refreshed
             ? $"Triggered refresh for endpoint '{endpointId}'."

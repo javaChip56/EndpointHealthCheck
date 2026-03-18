@@ -1,16 +1,23 @@
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Parsing;
+using ApiHealthDashboard.Tests.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace ApiHealthDashboard.Tests.Parsing;
 
 public sealed class HealthResponseParserTests
 {
-    private readonly HealthResponseParser _parser = new();
+    private readonly TestLogger<HealthResponseParser> _logger = new();
+
+    private HealthResponseParser CreateParser()
+    {
+        return new HealthResponseParser(_logger);
+    }
 
     [Fact]
     public void Parse_WithFlatPayload_ReturnsSnapshotAndPreservesRootMetadata()
     {
-        var snapshot = _parser.Parse(
+        var snapshot = CreateParser().Parse(
             CreateEndpoint("orders-api"),
             """
             {
@@ -36,7 +43,7 @@ public sealed class HealthResponseParserTests
     [Fact]
     public void Parse_WithEntriesPayload_ParsesTopLevelNodesAndNodeData()
     {
-        var snapshot = _parser.Parse(
+        var snapshot = CreateParser().Parse(
             CreateEndpoint("billing-api"),
             """
             {
@@ -76,7 +83,7 @@ public sealed class HealthResponseParserTests
     [Fact]
     public void Parse_WithNestedHealthPayload_ParsesRecursiveChildren()
     {
-        var snapshot = _parser.Parse(
+        var snapshot = CreateParser().Parse(
             CreateEndpoint("identity-api"),
             """
             {
@@ -118,7 +125,7 @@ public sealed class HealthResponseParserTests
         endpoint.IncludeChecks = ["database", "reporting"];
         endpoint.ExcludeChecks = ["reporting"];
 
-        var snapshot = _parser.Parse(
+        var snapshot = CreateParser().Parse(
             endpoint,
             """
             {
@@ -156,7 +163,7 @@ public sealed class HealthResponseParserTests
         var endpoint = CreateEndpoint("inventory-api");
         endpoint.IncludeChecks = ["reporting"];
 
-        var snapshot = _parser.Parse(
+        var snapshot = CreateParser().Parse(
             endpoint,
             """
             {
@@ -186,7 +193,7 @@ public sealed class HealthResponseParserTests
     [Fact]
     public void Parse_WithMalformedJson_ReturnsParserErrorSnapshot()
     {
-        var snapshot = _parser.Parse(
+        var snapshot = CreateParser().Parse(
             CreateEndpoint("broken-api"),
             """
             { "status": "Healthy", "entries": { "db": { "status": "Healthy" }
@@ -197,6 +204,21 @@ public sealed class HealthResponseParserTests
         Assert.Empty(snapshot.Nodes);
         Assert.True(snapshot.Metadata.ContainsKey("parserError"));
         Assert.NotNull(snapshot.Metadata["parserError"]);
+    }
+
+    [Fact]
+    public void Parse_WithMalformedJson_LogsWarning()
+    {
+        CreateParser().Parse(
+            CreateEndpoint("broken-api"),
+            """
+            { "status": "Healthy",
+            """,
+            5);
+
+        var warning = Assert.Single(_logger.Entries.Where(static entry => entry.LogLevel == LogLevel.Warning));
+        Assert.Contains("broken-api", warning.Message, StringComparison.Ordinal);
+        Assert.NotNull(warning.Exception);
     }
 
     private static EndpointConfig CreateEndpoint(string id)

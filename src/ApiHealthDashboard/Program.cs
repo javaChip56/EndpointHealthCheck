@@ -23,14 +23,29 @@ builder.Services.AddSingleton(static serviceProvider =>
         .CreateLogger("ApiHealthDashboard.Configuration");
 
     var resolvedPath = ResolveConfigPath(options.EndpointsConfigPath, environment.ContentRootPath);
-    var config = loader.Load(resolvedPath);
-
     logger.LogInformation(
-        "Loaded dashboard configuration from {ConfigPath} with {EndpointCount} endpoints.",
-        resolvedPath,
-        config.Endpoints.Count);
+        "Loading dashboard configuration from {ConfigPath}.",
+        resolvedPath);
 
-    return config;
+    try
+    {
+        var config = loader.Load(resolvedPath);
+
+        logger.LogInformation(
+            "Loaded dashboard configuration from {ConfigPath} with {EndpointCount} endpoints.",
+            resolvedPath,
+            config.Endpoints.Count);
+
+        return config;
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(
+            ex,
+            "Failed to load dashboard configuration from {ConfigPath}.",
+            resolvedPath);
+        throw;
+    }
 });
 builder.Services.AddSingleton<IEndpointStateStore>(static serviceProvider =>
 {
@@ -58,11 +73,40 @@ builder.Services.AddRazorPages();
 
 var app = builder.Build();
 
-_ = app.Services.GetRequiredService<DashboardConfig>();
-_ = app.Services.GetRequiredService<IEndpointStateStore>();
-_ = app.Services.GetRequiredService<IEndpointPoller>();
-_ = app.Services.GetRequiredService<IHealthResponseParser>();
-_ = app.Services.GetRequiredService<IEndpointScheduler>();
+app.Logger.LogInformation(
+    "Starting ApiHealthDashboard in {EnvironmentName} environment with content root {ContentRoot}.",
+    app.Environment.EnvironmentName,
+    app.Environment.ContentRootPath);
+
+try
+{
+    var dashboardConfig = app.Services.GetRequiredService<DashboardConfig>();
+    _ = app.Services.GetRequiredService<IEndpointStateStore>();
+    _ = app.Services.GetRequiredService<IEndpointPoller>();
+    _ = app.Services.GetRequiredService<IHealthResponseParser>();
+    _ = app.Services.GetRequiredService<IEndpointScheduler>();
+
+    app.Logger.LogInformation(
+        "Startup initialization completed for {EndpointCount} configured endpoints.",
+        dashboardConfig.Endpoints.Count);
+}
+catch (Exception ex)
+{
+    app.Logger.LogCritical(ex, "Startup initialization failed.");
+    throw;
+}
+
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    app.Logger.LogInformation(
+        "ApiHealthDashboard is accepting requests in {EnvironmentName}.",
+        app.Environment.EnvironmentName);
+});
+
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    app.Logger.LogInformation("ApiHealthDashboard is stopping.");
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

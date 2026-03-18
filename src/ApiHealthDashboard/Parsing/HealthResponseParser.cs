@@ -36,6 +36,13 @@ public sealed class HealthResponseParser : IHealthResponseParser
         "name"
     };
 
+    private readonly ILogger<HealthResponseParser> _logger;
+
+    public HealthResponseParser(ILogger<HealthResponseParser> logger)
+    {
+        _logger = logger;
+    }
+
     public HealthSnapshot Parse(EndpointConfig endpoint, string json, long durationMs)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
@@ -62,6 +69,11 @@ public sealed class HealthResponseParser : IHealthResponseParser
         }
         catch (JsonException ex)
         {
+            _logger.LogWarning(
+                ex,
+                "Failed to parse health response JSON for endpoint {EndpointId}.",
+                endpoint.Id);
+
             return new HealthSnapshot
             {
                 OverallStatus = "Unknown",

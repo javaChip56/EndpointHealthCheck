@@ -23,6 +23,7 @@ Implemented so far:
 - Phase 8: manual refresh actions and page-model tests
 - Phase 9: dashboard summary view and tests
 - Phase 10: endpoint details diagnostics view and tests
+- Phase 11: error handling and structured logging improvements
 
 Not implemented yet:
 - CI/CD workflows
@@ -190,6 +191,17 @@ Current details-page behavior:
 - surfaces snapshot metadata captured from the parsed response
 - shows the raw payload section only when enabled in configuration
 
+### Error Handling And Logging
+
+The app now emits clearer structured logs around startup, configuration loading, polling, parsing failures, and manual refresh actions.
+
+Current logging behavior:
+- logs startup initialization begin, completion, app-started, and app-stopping events
+- logs configuration load attempts, success, and startup-failure cases with the resolved YAML path
+- logs manual refresh requests from both the dashboard and endpoint details pages
+- logs poll start and completion with trigger source, duration, result kind, and HTTP status code when available
+- logs timeout, network, HTTP, parser, and scheduler-loop failure conditions without exposing secret header values
+
 ## Running The App
 
 From the repository root:
@@ -236,6 +248,7 @@ Current automated coverage includes:
 - parser nested payload handling
 - parser recursive filtering behavior
 - parser malformed JSON handling
+- parser malformed JSON warning logging
 - scheduler state update handling
 - scheduler overlap prevention
 - scheduler independent polling for enabled endpoints only
@@ -277,7 +290,7 @@ Test file:
 - [x] Phase 8 - Manual refresh actions
 - [x] Phase 9 - Dashboard summary page
 - [x] Phase 10 - Endpoint details page
-- [ ] Phase 11 - Error handling and logging
+- [x] Phase 11 - Error handling and logging
 - [ ] Phase 12 - Automated tests expansion
 - [ ] Phase 13 - Publish and deployment validation
 - [ ] Phase 14 - GitHub Actions CI/CD

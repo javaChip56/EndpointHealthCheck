@@ -8,6 +8,9 @@ namespace ApiHealthDashboard.Scheduling;
 
 public sealed class PollingSchedulerService : BackgroundService, IEndpointScheduler
 {
+    private const string ManualTriggerSource = "manual";
+    private const string ScheduledTriggerSource = "scheduled";
+
     private readonly DashboardConfig _dashboardConfig;
     private readonly Dictionary<string, EndpointConfig> _endpointsById;
     private readonly Dictionary<string, SemaphoreSlim> _endpointLocks;
@@ -47,6 +50,11 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             .Select(endpoint => RunEndpointLoopAsync(endpoint, stoppingToken))
             .ToArray();
 
+        _logger.LogInformation(
+            "Starting polling scheduler for {EnabledEndpointCount} enabled endpoints out of {TotalEndpointCount} configured endpoints.",
+            tasks.Length,
+            _dashboardConfig.Endpoints.Count);
+
         return tasks.Length == 0
             ? Task.CompletedTask
             : Task.WhenAll(tasks);
@@ -69,14 +77,15 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             lockAcquired = await endpointLock.WaitAsync(0, cancellationToken);
             if (!lockAcquired)
             {
-                _logger.LogDebug(
-                    "Skipped poll for endpoint {EndpointId} because a poll is already in progress.",
+                _logger.LogWarning(
+                    "Skipped {TriggerSource} refresh for endpoint {EndpointId} because a poll is already in progress.",
+                    ManualTriggerSource,
                     endpointId);
 
                 return false;
             }
 
-            await PollEndpointCoreAsync(endpoint, cancellationToken);
+            await PollEndpointCoreAsync(endpoint, ManualTriggerSource, cancellationToken);
             return true;
         }
         finally
@@ -113,7 +122,38 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             try
             {
                 await Task.Delay(interval, _timeProvider, cancellationToken);
-                await RefreshEndpointAsync(endpoint.Id, cancellationToken);
+
+                if (!_endpointLocks.TryGetValue(endpoint.Id, out var endpointLock))
+                {
+                    _logger.LogWarning(
+                        "Skipping scheduled poll for endpoint {EndpointId} because no endpoint lock was configured.",
+                        endpoint.Id);
+                    continue;
+                }
+
+                var lockAcquired = false;
+
+                try
+                {
+                    lockAcquired = await endpointLock.WaitAsync(0, cancellationToken);
+                    if (!lockAcquired)
+                    {
+                        _logger.LogDebug(
+                            "Skipped {TriggerSource} refresh for endpoint {EndpointId} because a poll is already in progress.",
+                            ScheduledTriggerSource,
+                            endpoint.Id);
+                        continue;
+                    }
+
+                    await PollEndpointCoreAsync(endpoint, ScheduledTriggerSource, cancellationToken);
+                }
+                finally
+                {
+                    if (lockAcquired)
+                    {
+                        endpointLock.Release();
+                    }
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -127,9 +167,13 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
                     endpoint.Id);
             }
         }
+
+        _logger.LogInformation(
+            "Stopped scheduler loop for endpoint {EndpointId}.",
+            endpoint.Id);
     }
 
-    private async Task PollEndpointCoreAsync(EndpointConfig endpoint, CancellationToken cancellationToken)
+    private async Task PollEndpointCoreAsync(EndpointConfig endpoint, string triggerSource, CancellationToken cancellationToken)
     {
         var state = _stateStore.Get(endpoint.Id) ?? CreateFallbackState(endpoint);
         state.EndpointName = endpoint.Name;
@@ -137,8 +181,10 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         _stateStore.Upsert(state);
 
         _logger.LogInformation(
-            "Starting scheduled poll for endpoint {EndpointId}.",
-            endpoint.Id);
+            "Starting {TriggerSource} poll for endpoint {EndpointId} with timeout {TimeoutSeconds}s.",
+            triggerSource,
+            endpoint.Id,
+            endpoint.TimeoutSeconds ?? _dashboardConfig.Dashboard.RequestTimeoutSecondsDefault);
 
         var result = await _endpointPoller.PollAsync(endpoint, cancellationToken);
 
@@ -158,8 +204,9 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             {
                 updatedState.LastError = $"Failed to parse health response: {parserError}";
                 _logger.LogWarning(
-                    "Parser produced an error snapshot for endpoint {EndpointId}: {ParserError}",
+                    "Parser produced an error snapshot for endpoint {EndpointId} during a {TriggerSource} poll: {ParserError}",
                     endpoint.Id,
+                    triggerSource,
                     parserError);
             }
             else
@@ -177,9 +224,13 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         _stateStore.Upsert(updatedState);
 
         _logger.LogInformation(
-            "Completed poll for endpoint {EndpointId} with status {EndpointStatus}.",
+            "Completed {TriggerSource} poll for endpoint {EndpointId} with status {EndpointStatus}, result kind {PollResultKind}, duration {DurationMs}ms, and status code {StatusCode}.",
+            triggerSource,
             endpoint.Id,
-            updatedState.Status);
+            updatedState.Status,
+            result.Kind,
+            result.DurationMs,
+            result.StatusCode);
     }
 
     private static EndpointState CreateFallbackState(EndpointConfig endpoint)
