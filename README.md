@@ -213,6 +213,8 @@ Current dashboard behavior:
 - highlights healthy, degraded, unhealthy, and unknown totals in summary cards
 - includes a client-side search field for filtering endpoint rows by name, id, status, or error text
 - refreshes the live dashboard section with same-origin timed GET requests instead of reloading the whole page
+- briefly flashes endpoint rows when they are manually refreshed or when background polling updates change the rendered row state
+- uses different row flash cues for routine updates, improving health transitions, and worsening health transitions
 - sorts endpoint summaries and active issues by endpoint priority before name
 - renders a live endpoint table with last check, duration, recent signal metrics, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage

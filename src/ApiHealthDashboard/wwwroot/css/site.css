@@ -209,12 +209,16 @@ body {
   vertical-align: top;
 }
 
-.dashboard-row-flash {
-  animation: dashboard-row-flash 1.8s ease-out;
+.dashboard-row-flash-update > td {
+  animation: dashboard-row-flash-update 1.8s ease-out;
 }
 
-.dashboard-row-flash > td {
-  background: rgba(15, 157, 138, 0.14);
+.dashboard-row-flash-improving > td {
+  animation: dashboard-row-flash-improving 1.9s ease-out;
+}
+
+.dashboard-row-flash-worsening > td {
+  animation: dashboard-row-flash-worsening 1.9s ease-out;
 }
 
 .dashboard-error-cell {
@@ -611,7 +615,7 @@ body {
   font-size: 0.9rem;
 }
 
-@keyframes dashboard-row-flash {
+@keyframes dashboard-row-flash-update {
   0% {
     box-shadow: inset 0 0 0 999px rgba(15, 157, 138, 0.2);
   }
@@ -622,6 +626,34 @@ body {
 
   100% {
     box-shadow: inset 0 0 0 999px rgba(15, 157, 138, 0);
+  }
+}
+
+@keyframes dashboard-row-flash-improving {
+  0% {
+    box-shadow: inset 0 0 0 999px rgba(40, 167, 69, 0.24);
+  }
+
+  40% {
+    box-shadow: inset 0 0 0 999px rgba(40, 167, 69, 0.1);
+  }
+
+  100% {
+    box-shadow: inset 0 0 0 999px rgba(40, 167, 69, 0);
+  }
+}
+
+@keyframes dashboard-row-flash-worsening {
+  0% {
+    box-shadow: inset 0 0 0 999px rgba(245, 158, 11, 0.28);
+  }
+
+  40% {
+    box-shadow: inset 0 0 0 999px rgba(245, 158, 11, 0.12);
+  }
+
+  100% {
+    box-shadow: inset 0 0 0 999px rgba(245, 158, 11, 0);
   }
 }
 

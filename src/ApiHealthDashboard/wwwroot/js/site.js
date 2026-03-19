@@ -165,7 +165,7 @@ function initializeDashboardSectionRefresh() {
     }
 
     const preservedQuery = getCurrentSearchQuery(container);
-    const previousRowSignatures = getEndpointRowSignatures(container);
+    const previousRowStates = getEndpointRowStates(container);
 
     try {
       const response = await fetch(refreshUrl, {
@@ -187,7 +187,7 @@ function initializeDashboardSectionRefresh() {
       initializeDisabledActions(container);
       initializeEndpointSearch(container, preservedQuery);
       initializeEndpointRefreshForms(container);
-      flashChangedEndpointRows(container, previousRowSignatures);
+      flashChangedEndpointRows(container, previousRowStates);
       applyPendingEndpointFlash(container);
       initializeCopyButtons(container);
     } catch {
@@ -218,8 +218,8 @@ function cssEscape(value) {
   return value.replace(/["\\]/g, "\\$&");
 }
 
-function getEndpointRowSignatures(root) {
-  const signatures = new Map();
+function getEndpointRowStates(root) {
+  const rowStates = new Map();
 
   root.querySelectorAll("[data-endpoint-row-id]").forEach((row) => {
     const endpointId = row.getAttribute("data-endpoint-row-id");
@@ -227,38 +227,84 @@ function getEndpointRowSignatures(root) {
       return;
     }
 
-    signatures.set(endpointId, row.getAttribute("data-endpoint-row-signature") || "");
+    rowStates.set(endpointId, {
+      signature: row.getAttribute("data-endpoint-row-signature") || "",
+      status: row.getAttribute("data-endpoint-row-status") || ""
+    });
   });
 
-  return signatures;
+  return rowStates;
 }
 
-function flashChangedEndpointRows(root, previousRowSignatures) {
-  if (!previousRowSignatures || previousRowSignatures.size === 0) {
+function flashChangedEndpointRows(root, previousRowStates) {
+  if (!previousRowStates || previousRowStates.size === 0) {
     return;
   }
 
   root.querySelectorAll("[data-endpoint-row-id]").forEach((row) => {
     const endpointId = row.getAttribute("data-endpoint-row-id");
-    if (!endpointId || !previousRowSignatures.has(endpointId)) {
+    if (!endpointId || !previousRowStates.has(endpointId)) {
       return;
     }
 
-    const previousSignature = previousRowSignatures.get(endpointId) || "";
+    const previousState = previousRowStates.get(endpointId);
+    const previousSignature = previousState ? previousState.signature : "";
+    const previousStatus = previousState ? previousState.status : "";
     const currentSignature = row.getAttribute("data-endpoint-row-signature") || "";
+    const currentStatus = row.getAttribute("data-endpoint-row-status") || "";
 
     if (previousSignature !== currentSignature) {
-      flashEndpointRow(row);
+      const flashClass = getFlashClassForStatusChange(previousStatus, currentStatus);
+
+      flashEndpointRow(row, flashClass);
     }
   });
 }
 
-function flashEndpointRow(row) {
-  row.classList.remove("dashboard-row-flash");
+function flashEndpointRow(row, flashClass = "dashboard-row-flash-update") {
+  row.classList.remove(
+    "dashboard-row-flash-update",
+    "dashboard-row-flash-improving",
+    "dashboard-row-flash-worsening"
+  );
   void row.offsetWidth;
-  row.classList.add("dashboard-row-flash");
+  row.classList.add(flashClass);
 
   window.setTimeout(() => {
-    row.classList.remove("dashboard-row-flash");
+    row.classList.remove(flashClass);
   }, 2200);
+}
+
+function getFlashClassForStatusChange(previousStatus, currentStatus) {
+  if (previousStatus === currentStatus) {
+    return "dashboard-row-flash-update";
+  }
+
+  const previousRank = getEndpointStatusRank(previousStatus);
+  const currentRank = getEndpointStatusRank(currentStatus);
+
+  if (currentRank > previousRank) {
+    return "dashboard-row-flash-improving";
+  }
+
+  if (currentRank < previousRank) {
+    return "dashboard-row-flash-worsening";
+  }
+
+  return "dashboard-row-flash-update";
+}
+
+function getEndpointStatusRank(status) {
+  switch ((status || "").toLowerCase()) {
+    case "healthy":
+      return 3;
+    case "degraded":
+      return 2;
+    case "unhealthy":
+      return 1;
+    case "unknown":
+      return 0;
+    default:
+      return 0;
+  }
 }
