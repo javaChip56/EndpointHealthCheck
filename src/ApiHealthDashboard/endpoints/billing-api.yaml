@@ -8,3 +8,5 @@ timeoutSeconds: 15
 headers: {}
 includeChecks: []
 excludeChecks: []
+notificationEmails:
+  - 'gali@phillip.com.sg'

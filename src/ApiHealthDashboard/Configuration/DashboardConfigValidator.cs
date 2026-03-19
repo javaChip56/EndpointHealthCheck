@@ -1,7 +1,11 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ApiHealthDashboard.Configuration;
 
 public sealed class DashboardConfigValidator
 {
+    private static readonly EmailAddressAttribute EmailValidator = new();
+
     public IReadOnlyList<string> Validate(DashboardConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -18,6 +22,20 @@ public sealed class DashboardConfigValidator
         {
             errors.Add("dashboard.requestTimeoutSecondsDefault must be greater than zero.");
         }
+
+        if (config.Dashboard.Notifications.CooldownMinutes <= 0)
+        {
+            errors.Add("dashboard.notifications.cooldownMinutes must be greater than zero.");
+        }
+
+        if (!EndpointPriority.IsValid(config.Dashboard.Notifications.MinimumPriority))
+        {
+            errors.Add(
+                $"dashboard.notifications.minimumPriority must be one of: {string.Join(", ", EndpointPriority.AllowedValues)}.");
+        }
+
+        ValidateEmailList(config.Dashboard.Notifications.To, "dashboard.notifications.to", errors);
+        ValidateEmailList(config.Dashboard.Notifications.Cc, "dashboard.notifications.cc", errors);
 
         for (var index = 0; index < config.Endpoints.Count; index++)
         {
@@ -71,8 +89,26 @@ public sealed class DashboardConfigValidator
                     errors.Add($"{prefix}.headers contains an empty header name.");
                 }
             }
+
+            ValidateEmailList(endpoint.NotificationEmails, $"{prefix}.notificationEmails", errors);
+            ValidateEmailList(endpoint.NotificationCc, $"{prefix}.notificationCc", errors);
         }
 
         return errors;
+    }
+
+    private static void ValidateEmailList(IEnumerable<string> values, string prefix, ICollection<string> errors)
+    {
+        var index = 0;
+
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value) || !EmailValidator.IsValid(value))
+            {
+                errors.Add($"{prefix}[{index}] must be a valid email address.");
+            }
+
+            index++;
+        }
     }
 }

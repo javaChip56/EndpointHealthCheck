@@ -59,4 +59,51 @@ public sealed class RecentPollTrendAnalyzerTests
 
         Assert.Equal(RecentPollTrendKind.Stable, result.TrendKind);
     }
+
+    [Fact]
+    public void Analyze_WhenRecentSamplesSettleIntoBetterStatus_ChangesFromFlappingToImproving()
+    {
+        var samples = new[]
+        {
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 0, 0, TimeSpan.Zero),
+                Status = "Degraded",
+                DurationMs = 90,
+                ResultKind = "Success"
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 1, 0, TimeSpan.Zero),
+                Status = "Healthy",
+                DurationMs = 92,
+                ResultKind = "Success"
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 2, 0, TimeSpan.Zero),
+                Status = "Degraded",
+                DurationMs = 94,
+                ResultKind = "Success"
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 3, 0, TimeSpan.Zero),
+                Status = "Healthy",
+                DurationMs = 91,
+                ResultKind = "Success"
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 4, 0, TimeSpan.Zero),
+                Status = "Healthy",
+                DurationMs = 89,
+                ResultKind = "Success"
+            }
+        };
+
+        var result = RecentPollTrendAnalyzer.Analyze(samples);
+
+        Assert.Equal(RecentPollTrendKind.Improving, result.TrendKind);
+    }
 }

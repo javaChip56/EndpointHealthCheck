@@ -13,6 +13,7 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
 
     private readonly DashboardConfig _dashboardConfig;
     private readonly IEndpointPoller _endpointPoller;
+    private readonly IEndpointNotificationService _endpointNotificationService;
     private readonly IHealthResponseParser _healthResponseParser;
     private readonly ILogger<PollingSchedulerService> _logger;
     private readonly RuntimeStateOptions _runtimeStateOptions;
@@ -28,6 +29,7 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         DashboardConfig dashboardConfig,
         IEndpointStateStore stateStore,
         IEndpointPoller endpointPoller,
+        IEndpointNotificationService endpointNotificationService,
         IHealthResponseParser healthResponseParser,
         RuntimeStateOptions runtimeStateOptions,
         TimeProvider timeProvider,
@@ -36,6 +38,7 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         _dashboardConfig = dashboardConfig;
         _stateStore = stateStore;
         _endpointPoller = endpointPoller;
+        _endpointNotificationService = endpointNotificationService;
         _healthResponseParser = healthResponseParser;
         _runtimeStateOptions = runtimeStateOptions;
         _timeProvider = timeProvider;
@@ -195,7 +198,8 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
 
     private async Task PollEndpointCoreAsync(EndpointConfig endpoint, string triggerSource, CancellationToken cancellationToken)
     {
-        var state = _stateStore.Get(endpoint.Id) ?? CreateFallbackState(endpoint);
+        var previousState = _stateStore.Get(endpoint.Id);
+        var state = previousState?.Clone() ?? CreateFallbackState(endpoint);
         state.EndpointName = endpoint.Name;
         state.IsPolling = true;
         _stateStore.Upsert(state);
@@ -244,6 +248,22 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         AppendRecentSample(updatedState, result);
 
         _stateStore.Upsert(updatedState);
+
+        try
+        {
+            await _endpointNotificationService.NotifyAsync(
+                endpoint,
+                previousState,
+                updatedState.Clone(),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to process email notifications for endpoint {EndpointId}.",
+                endpoint.Id);
+        }
 
         _logger.LogInformation(
             "Completed {TriggerSource} poll for endpoint {EndpointId} with status {EndpointStatus}, result kind {PollResultKind}, duration {DurationMs}ms, and status code {StatusCode}.",

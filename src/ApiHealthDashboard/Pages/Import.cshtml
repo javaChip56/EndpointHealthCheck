@@ -133,6 +133,28 @@
                                 </div>
                             </div>
 
+                            <div class="import-form-section">
+                                <div class="import-section-label">Email Notifications</div>
+                                <div class="form-row">
+                                    <div class="form-group col-md-6">
+                                        <label asp-for="Input.NotificationEmailsText"></label>
+                                        <textarea asp-for="Input.NotificationEmailsText"
+                                                  class="form-control import-headers-box"
+                                                  rows="5"
+                                                  placeholder="ops@example.com&#10;oncall@example.com"></textarea>
+                                        <small class="form-text text-muted">One address per line, or separate with commas or semicolons.</small>
+                                    </div>
+                                    <div class="form-group col-md-6 mb-0">
+                                        <label asp-for="Input.NotificationCcText"></label>
+                                        <textarea asp-for="Input.NotificationCcText"
+                                                  class="form-control import-headers-box"
+                                                  rows="5"
+                                                  placeholder="teamlead@example.com&#10;manager@example.com"></textarea>
+                                        <small class="form-text text-muted">Optional CC recipients for endpoint-specific notifications.</small>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="import-toggle-panel">
                                 <div class="import-toggle-item">
                                     <div class="custom-control custom-switch">

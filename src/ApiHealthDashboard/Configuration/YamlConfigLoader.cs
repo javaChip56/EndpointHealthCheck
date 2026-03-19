@@ -260,6 +260,11 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
     private static void Normalize(DashboardConfig config)
     {
         config.Dashboard ??= new DashboardSettings();
+        config.Dashboard.Notifications ??= new DashboardNotificationSettings();
+        config.Dashboard.Notifications.MinimumPriority = EndpointPriority.Normalize(config.Dashboard.Notifications.MinimumPriority);
+        config.Dashboard.Notifications.SubjectPrefix = config.Dashboard.Notifications.SubjectPrefix?.Trim() ?? "[ApiHealthDashboard]";
+        config.Dashboard.Notifications.To = NormalizeEmailList(config.Dashboard.Notifications.To);
+        config.Dashboard.Notifications.Cc = NormalizeEmailList(config.Dashboard.Notifications.Cc);
         config.EndpointFiles = NormalizeFileList(config.EndpointFiles);
         config.Endpoints ??= new List<EndpointConfig>();
         NormalizeEndpoints(config.Endpoints);
@@ -285,6 +290,8 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
                 : new Dictionary<string, string>(endpoint.Headers, StringComparer.OrdinalIgnoreCase);
             endpoint.IncludeChecks = NormalizeCheckList(endpoint.IncludeChecks);
             endpoint.ExcludeChecks = NormalizeCheckList(endpoint.ExcludeChecks);
+            endpoint.NotificationEmails = NormalizeEmailList(endpoint.NotificationEmails);
+            endpoint.NotificationCc = NormalizeEmailList(endpoint.NotificationCc);
 
             endpoints[index] = endpoint;
         }
@@ -316,6 +323,20 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
             .ToList();
     }
 
+    private static List<string> NormalizeEmailList(List<string>? values)
+    {
+        if (values is null)
+        {
+            return new List<string>();
+        }
+
+        return values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private static string ReplaceEnvironmentTokens(string yaml)
     {
         return EnvironmentVariablePattern().Replace(
@@ -344,6 +365,8 @@ public sealed partial class YamlConfigLoader : IYamlConfigLoader
                 endpoint.Headers.Count > 0 ||
                 endpoint.IncludeChecks.Count > 0 ||
                 endpoint.ExcludeChecks.Count > 0 ||
+                endpoint.NotificationEmails.Count > 0 ||
+                endpoint.NotificationCc.Count > 0 ||
                 endpoint.Enabled != true ||
                 endpoint.FrequencySeconds != 30);
     }

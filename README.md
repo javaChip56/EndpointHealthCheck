@@ -34,6 +34,7 @@ Implemented so far:
 - Post-v1: runtime-state cleanup and retention settings for orphaned persisted state files
 - Post-v1: recent poll sample retention with derived dashboard and details metrics
 - Post-v1: mini trend visuals and short status history from retained runtime samples
+- Post-v1: SMTP email notifications with dashboard defaults and per-endpoint recipients
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -88,9 +89,11 @@ Current configuration support:
 - `dashboard.requestTimeoutSecondsDefault`
 - `dashboard.showRawPayload`
 - `dashboard.endpointFiles` for loading endpoints from one or more separate YAML files
+- `dashboard.notifications.enabled`, `notifyOnRecovery`, `cooldownMinutes`, `minimumPriority`, `subjectPrefix`, `to`, and `cc`
 - endpoint `id`, `name`, `url`, `enabled`, `frequencySeconds`, `timeoutSeconds`
 - endpoint `priority` with `Critical`, `High`, `Normal`, or `Low`
 - endpoint `headers`, `includeChecks`, `excludeChecks`
+- endpoint `notificationEmails` and `notificationCc`
 - `${ENV_VAR}` substitution in YAML values
 - endpoint definitions can be kept inline in `dashboard.yaml` or split into multiple files under [`src/ApiHealthDashboard/endpoints`](src/ApiHealthDashboard/endpoints)
 - project YAML files are copied to both build and publish output by default
@@ -178,6 +181,7 @@ Current behavior:
 - prevents overlapping polls for the same endpoint with endpoint-level locking
 - updates runtime state before and after each poll
 - records last checked time, last successful time, duration, status, and current error
+- triggers email notifications when an endpoint enters a problem state, changes alert state, or recovers
 - keeps slow endpoints from blocking other endpoint loops
 - already exposes a scheduler interface that Phase 8 can reuse for manual refresh actions
 - restarts enabled polling loops automatically when YAML hot-reload changes the configured endpoint set
@@ -231,10 +235,23 @@ Current import behavior:
 - auto-suggests endpoint id and name when those fields are left blank
 - shows a soft warning when the chosen poll frequency is below the configured appsettings recommendation
 - emits generated YAML with a normalized endpoint priority value
+- allows notification recipients and per-endpoint CC recipients to be entered and included in generated YAML
 - parses discovered checks from the response and can optionally populate `includeChecks`
 - generates a normalized YAML snippet for manual copy into `dashboard.yaml` or a separate endpoint file
 - compares the generated YAML against the currently loaded config when an existing endpoint matches by id or URL
 - shows a diff preview plus a raw response preview for review before any manual save
+
+### Email Notifications
+
+The app now supports SMTP email notifications with dashboard-level defaults and per-endpoint recipient overrides.
+
+Current email notification behavior:
+- uses SMTP settings from appsettings under `Email:Smtp`
+- uses dashboard YAML settings to enable notifications, set recovery behavior, cooldown, minimum priority, subject prefix, and default recipients
+- merges global dashboard recipients with endpoint-specific `notificationEmails` and `notificationCc`
+- sends alert emails when an endpoint enters or changes problem state
+- can send recovery emails when an endpoint returns to a non-problem state
+- treats repeated transport failures as a `Failing` condition for alerting purposes
 
 ### CLI Execution
 
@@ -331,6 +348,8 @@ The app reads the dashboard YAML path from the `Bootstrap:DashboardConfigPath` s
 The current primary setting is `Bootstrap:DashboardConfigPath`. `Bootstrap:EndpointsConfigPath` is still accepted as a legacy fallback.
 
 Runtime state persistence is configured through `RuntimeState:Enabled` and `RuntimeState:DirectoryPath` in the same appsettings files. By default, the app writes compact per-endpoint current-state files under `runtime-state/endpoints` relative to the app content root.
+
+SMTP email delivery is configured through `Email:Smtp` in the same appsettings files. Keep secrets such as SMTP usernames and passwords in environment variables or deployment-time configuration rather than committing them to source control.
 
 Current cleanup settings:
 - `RuntimeState:CleanupEnabled` to enable periodic runtime-state cleanup
@@ -510,7 +529,7 @@ Test file:
 These are planned enhancements after the current v1 path:
 - add configurable retention controls for future persisted history files once trend capture is introduced
 - optionally add per-endpoint history files once the embedded recent-sample window is no longer sufficient
-- optionally allow email sending, either through direct SMTP configuration or by calling an external API
+- optionally add external email API delivery in addition to the current SMTP implementation
 
 ## Notes For Ongoing Updates
 

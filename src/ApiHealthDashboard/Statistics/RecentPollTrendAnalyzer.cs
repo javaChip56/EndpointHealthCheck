@@ -64,6 +64,26 @@ public static class RecentPollTrendAnalyzer
             return RecentPollTrendKind.Stable;
         }
 
+        var currentStatus = NormalizeStatus(orderedSamples[^1].Status);
+        var currentStreakLength = GetTrailingStatusStreakLength(orderedSamples, currentStatus);
+        var previousDifferentStatus = GetPreviousDifferentStatus(orderedSamples, currentStatus);
+
+        if (currentStreakLength >= 2 && previousDifferentStatus is not null)
+        {
+            var previousRank = GetStatusRank(previousDifferentStatus);
+            var currentRank = GetStatusRank(currentStatus);
+
+            if (currentRank > previousRank)
+            {
+                return RecentPollTrendKind.Improving;
+            }
+
+            if (currentRank < previousRank)
+            {
+                return RecentPollTrendKind.Worsening;
+            }
+        }
+
         if (transitions.Count >= 3)
         {
             return RecentPollTrendKind.Flapping;
@@ -83,6 +103,37 @@ public static class RecentPollTrendAnalyzer
         }
 
         return RecentPollTrendKind.Flapping;
+    }
+
+    private static int GetTrailingStatusStreakLength(IReadOnlyList<RecentPollSample> orderedSamples, string currentStatus)
+    {
+        var streakLength = 0;
+
+        for (var index = orderedSamples.Count - 1; index >= 0; index--)
+        {
+            if (!string.Equals(NormalizeStatus(orderedSamples[index].Status), currentStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            streakLength++;
+        }
+
+        return streakLength;
+    }
+
+    private static string? GetPreviousDifferentStatus(IReadOnlyList<RecentPollSample> orderedSamples, string currentStatus)
+    {
+        for (var index = orderedSamples.Count - 1; index >= 0; index--)
+        {
+            var sampleStatus = NormalizeStatus(orderedSamples[index].Status);
+            if (!string.Equals(sampleStatus, currentStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                return sampleStatus;
+            }
+        }
+
+        return null;
     }
 
     private static bool IsFailedSample(RecentPollSample sample)

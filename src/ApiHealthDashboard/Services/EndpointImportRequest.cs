@@ -17,4 +17,8 @@ public sealed class EndpointImportRequest
     public string HeadersText { get; init; } = string.Empty;
 
     public bool IncludeDiscoveredChecks { get; init; }
+
+    public string NotificationEmailsText { get; init; } = string.Empty;
+
+    public string NotificationCcText { get; init; } = string.Empty;
 }

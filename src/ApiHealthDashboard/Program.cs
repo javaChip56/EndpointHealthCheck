@@ -29,8 +29,12 @@ builder.Services.Configure<ImportUiOptions>(
     builder.Configuration.GetSection(ImportUiOptions.SectionName));
 builder.Services.Configure<RuntimeStateOptions>(
     builder.Configuration.GetSection(RuntimeStateOptions.SectionName));
+builder.Services.Configure<SmtpEmailOptions>(
+    builder.Configuration.GetSection(SmtpEmailOptions.SectionName));
 builder.Services.AddSingleton(static serviceProvider =>
     serviceProvider.GetRequiredService<IOptions<RuntimeStateOptions>>().Value);
+builder.Services.AddSingleton(static serviceProvider =>
+    serviceProvider.GetRequiredService<IOptions<SmtpEmailOptions>>().Value);
 builder.Services.AddSingleton<DashboardConfigValidator>();
 builder.Services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 builder.Services.AddSingleton(static serviceProvider =>
@@ -116,6 +120,8 @@ builder.Services.AddHttpClient(nameof(EndpointPoller));
 builder.Services.AddSingleton<IEndpointPoller, EndpointPoller>();
 builder.Services.AddSingleton<IEndpointImportService, EndpointImportService>();
 builder.Services.AddSingleton<IHealthResponseParser, HealthResponseParser>();
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+builder.Services.AddSingleton<IEndpointNotificationService, EndpointEmailNotificationService>();
 builder.Services.AddSingleton<CliExecutionService>();
 builder.Services.AddSingleton<PollingSchedulerService>();
 builder.Services.AddSingleton<IEndpointScheduler>(static serviceProvider =>

@@ -1,0 +1,15 @@
+id: 'utpl-integration-api'
+name: 'UTPL Integration API'
+url: 'http://10.30.23.166:8114/hc'
+enabled: true
+priority: 'Normal'
+frequencySeconds: 5
+timeoutSeconds: 30
+includeChecks:
+  - 'GlobalConfigApi'
+  - 'GWMCoreOrderMailingAPI'
+  - 'GWMDB Database'
+  - 'LookupApi'
+  - 'UTPLConfig'
+notificationEmails:
+  - 'gali@phillip.com.sg'

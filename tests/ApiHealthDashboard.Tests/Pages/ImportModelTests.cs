@@ -21,7 +21,9 @@ public sealed class ImportModelTests
                 Name = "Orders API",
                 Url = "https://orders.example.com/health",
                 Enabled = true,
-                FrequencySeconds = 30
+                FrequencySeconds = 30,
+                NotificationEmails = ["ops@example.com"],
+                NotificationCc = ["lead@example.com"]
             },
             GeneratedYaml = "id: 'orders-api'",
             ProbeResult = new PollResult
@@ -45,7 +47,9 @@ public sealed class ImportModelTests
             Input = new ImportModel.InputModel
             {
                 Url = "https://orders.example.com/health",
-                FrequencySeconds = 30
+                FrequencySeconds = 30,
+                NotificationEmailsText = "ops@example.com",
+                NotificationCcText = "lead@example.com"
             }
         };
 
@@ -55,6 +59,8 @@ public sealed class ImportModelTests
         Assert.NotNull(model.Result);
         Assert.Equal("orders-api", model.Input.Id);
         Assert.Equal("Orders API", model.Input.Name);
+        Assert.Equal("ops@example.com", model.Input.NotificationEmailsText);
+        Assert.Equal("lead@example.com", model.Input.NotificationCcText);
         Assert.Equal("Poll frequency below the recommended soft limit of 180 seconds may create unnecessary load.", model.FrequencyRecommendationWarning);
     }
 

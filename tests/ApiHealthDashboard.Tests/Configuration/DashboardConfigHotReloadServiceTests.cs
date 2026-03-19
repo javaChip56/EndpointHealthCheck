@@ -58,6 +58,7 @@ public sealed class DashboardConfigHotReloadServiceTests : IDisposable
             sharedConfig,
             stateStore,
             new StubEndpointPoller(),
+            new NoOpEndpointNotificationService(),
             new StubHealthResponseParser(),
             new RuntimeStateOptions(),
             TimeProvider.System,
@@ -175,6 +176,14 @@ public sealed class DashboardConfigHotReloadServiceTests : IDisposable
                 DurationMs = durationMs,
                 RawPayload = json
             };
+        }
+    }
+
+    private sealed class NoOpEndpointNotificationService : IEndpointNotificationService
+    {
+        public Task NotifyAsync(EndpointConfig endpoint, EndpointState? previousState, EndpointState currentState, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }

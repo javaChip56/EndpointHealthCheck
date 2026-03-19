@@ -39,6 +39,7 @@ public sealed class PollingSchedulerReloadTests
             sharedConfig,
             stateStore,
             new NoOpEndpointPoller(),
+            new NoOpEndpointNotificationService(),
             new NoOpHealthResponseParser(),
             new RuntimeStateOptions(),
             TimeProvider.System,
@@ -78,6 +79,14 @@ public sealed class PollingSchedulerReloadTests
         public HealthSnapshot Parse(EndpointConfig endpoint, string json, long durationMs)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class NoOpEndpointNotificationService : IEndpointNotificationService
+    {
+        public Task NotifyAsync(EndpointConfig endpoint, EndpointState? previousState, EndpointState currentState, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }

@@ -383,6 +383,7 @@ public sealed class PollingSchedulerServiceTests
             config,
             stateStore,
             endpointPoller,
+            new NoOpEndpointNotificationService(),
             healthResponseParser,
             runtimeStateOptions ?? new RuntimeStateOptions(),
             TimeProvider.System,
@@ -416,6 +417,14 @@ public sealed class PollingSchedulerServiceTests
         public HealthSnapshot Parse(EndpointConfig endpoint, string json, long durationMs)
         {
             return _parse(endpoint, json, durationMs);
+        }
+    }
+
+    private sealed class NoOpEndpointNotificationService : IEndpointNotificationService
+    {
+        public Task NotifyAsync(EndpointConfig endpoint, EndpointState? previousState, EndpointState currentState, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }
