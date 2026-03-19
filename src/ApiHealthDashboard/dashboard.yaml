@@ -16,4 +16,3 @@ dashboard:
 endpointFiles:
   - endpoints/orders-api.yaml
   - endpoints/billing-api.yaml
-  - endpoints/utpl-integration-api.yaml
