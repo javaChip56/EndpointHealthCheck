@@ -68,7 +68,12 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
 
         var previousCondition = DescribeCondition(previousState);
         var currentCondition = DescribeCondition(currentState);
-        var notification = BuildNotificationDecision(endpoint, notificationSettings, previousCondition, currentCondition);
+        var hasExistingDispatchRecord = _dispatchRecords.ContainsKey(endpoint.Id);
+        var notification = BuildNotificationDecision(
+            notificationSettings,
+            previousCondition,
+            currentCondition,
+            hasExistingDispatchRecord);
         if (notification is null)
         {
             return;
@@ -174,14 +179,16 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
     }
 
     private static NotificationDecision? BuildNotificationDecision(
-        EndpointConfig endpoint,
         DashboardNotificationSettings settings,
         NotificationCondition previousCondition,
-        NotificationCondition currentCondition)
+        NotificationCondition currentCondition,
+        bool hasExistingDispatchRecord)
     {
         if (currentCondition.IsProblem)
         {
-            if (!previousCondition.IsProblem || !string.Equals(previousCondition.Label, currentCondition.Label, StringComparison.OrdinalIgnoreCase))
+            if (!hasExistingDispatchRecord ||
+                !previousCondition.IsProblem ||
+                !string.Equals(previousCondition.Label, currentCondition.Label, StringComparison.OrdinalIgnoreCase))
             {
                 return new NotificationDecision(
                     "Alert",

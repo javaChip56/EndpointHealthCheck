@@ -143,6 +143,51 @@ public sealed class EndpointEmailNotificationServiceTests
         Assert.Contains("Recovery", message.Subject, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task NotifyAsync_WhenEndpointIsAlreadyFailingAndNoPriorNotificationExists_SendsInitialAlert()
+    {
+        var config = CreateConfig();
+        var sender = new FakeEmailSender();
+        var service = CreateService(config, sender);
+
+        var previousState = new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Unknown",
+            LastCheckedUtc = DateTimeOffset.Parse("2026-03-19T01:05:00Z"),
+            LastError = "Timed out",
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T01:04:00Z"),
+                    Status = "Unknown",
+                    DurationMs = 200,
+                    ResultKind = "Timeout",
+                    ErrorSummary = "Timed out"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T01:05:00Z"),
+                    Status = "Unknown",
+                    DurationMs = 210,
+                    ResultKind = "NetworkError",
+                    ErrorSummary = "Connection refused"
+                }
+            ]
+        };
+
+        var currentState = previousState.Clone();
+        currentState.LastCheckedUtc = DateTimeOffset.Parse("2026-03-19T01:06:00Z");
+
+        await service.NotifyAsync(config.Endpoints[0], previousState, currentState);
+
+        var message = Assert.Single(sender.Messages);
+        Assert.Contains("Alert", message.Subject, StringComparison.Ordinal);
+        Assert.Contains("Failing", message.Subject, StringComparison.Ordinal);
+    }
+
     private static EndpointEmailNotificationService CreateService(DashboardConfig config, FakeEmailSender sender)
     {
         return new EndpointEmailNotificationService(
