@@ -221,6 +221,14 @@ else
                             }
                             else
                             {
+                                <div class="recent-trend-card mb-3">
+                                    <div class="recent-trend-header">
+                                        <span class="badge @endpoint.RecentTrendBadgeClass">@endpoint.RecentTrendText</span>
+                                        <small class="text-muted">Last status change: @endpoint.LastStatusChangeText</small>
+                                    </div>
+                                    <p class="text-muted mb-0 mt-2">@endpoint.RecentTrendSummary</p>
+                                </div>
+
                                 <div class="metric-list">
                                     <div class="metric-item">
                                         <span class="metric-label">Retained samples</span>
@@ -354,6 +362,48 @@ else
                                         <partial name="_HealthNode" model="node" />
                                     }
                                 </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Status History</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasRecentSamples)
+                            {
+                                <div class="text-muted">Recent status history will appear here after enough runtime samples have been collected.</div>
+                            }
+                            else
+                            {
+                                <div class="sample-indicator-strip mb-3" aria-label="Recent status trend">
+                                    @foreach (var sample in endpoint.RecentSamples)
+                                    {
+                                        <span class="sample-indicator @sample.IndicatorBadgeClass" title="@sample.CheckedText - @sample.Status via @sample.ResultKind"></span>
+                                    }
+                                </div>
+
+                                @if (!endpoint.HasStatusTransitions)
+                                {
+                                    <div class="text-muted">No status transition has been observed in the retained sample window.</div>
+                                }
+                                else
+                                {
+                                    <div class="status-history-list">
+                                        @foreach (var transition in endpoint.RecentStatusTransitions)
+                                        {
+                                            <div class="status-history-item">
+                                                <div class="status-history-badges">
+                                                    <span class="badge @transition.FromStatusBadgeClass">@transition.FromStatus</span>
+                                                    <i class="fas fa-arrow-right text-muted"></i>
+                                                    <span class="badge @transition.ToStatusBadgeClass">@transition.ToStatus</span>
+                                                </div>
+                                                <div class="status-history-time">@transition.ChangedText</div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
                             }
                         </div>
                     </div>

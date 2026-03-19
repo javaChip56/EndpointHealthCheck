@@ -175,6 +175,11 @@ public sealed class DetailsModelTests
         Assert.Equal("1 failure", model.Endpoint.RecentFailureCountText);
         Assert.Equal("305 ms", model.Endpoint.RecentAverageDurationText);
         Assert.Equal("2026-03-18 08:30:00 UTC", model.Endpoint.LastStatusChangeText);
+        Assert.Equal("Worsening", model.Endpoint.RecentTrendText);
+        Assert.Equal("badge-warning", model.Endpoint.RecentTrendBadgeClass);
+        Assert.Single(model.Endpoint.RecentStatusTransitions);
+        Assert.Equal("Healthy", model.Endpoint.RecentStatusTransitions[0].FromStatus);
+        Assert.Equal("Degraded", model.Endpoint.RecentStatusTransitions[0].ToStatus);
         Assert.Equal(2, model.Endpoint.RecentSamples.Count);
         Assert.Equal(
             "{\n  \"status\": \"Degraded\"\n}",

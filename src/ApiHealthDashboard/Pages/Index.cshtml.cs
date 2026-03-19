@@ -194,6 +194,14 @@ public class IndexModel : PageModel
 
         public string RecentFailureCountText { get; init; } = "0 failures";
 
+        public string RecentTrendText { get; init; } = "Awaiting trend";
+
+        public string RecentTrendBadgeClass { get; init; } = "badge-light";
+
+        public string RecentTrendSummary { get; init; } = "Need more samples to detect a trend.";
+
+        public string RecentLastChangeText { get; init; } = "No recent change";
+
         public IReadOnlyList<RecentSampleIndicatorViewModel> RecentIndicators { get; init; } = [];
 
         public string? ErrorText { get; init; }
@@ -217,6 +225,7 @@ public class IndexModel : PageModel
                 .Select(static sample => sample.Clone())
                 .ToArray() ?? [];
             var recentMetrics = RecentPollSampleMetricsCalculator.Calculate(recentSamples);
+            var trendAnalysis = RecentPollTrendAnalyzer.Analyze(recentSamples);
 
             return new EndpointSummaryViewModel
             {
@@ -243,6 +252,12 @@ public class IndexModel : PageModel
                 RecentFailureCountText = recentMetrics.HasSamples
                     ? $"{recentMetrics.FailureCount} failure{(recentMetrics.FailureCount == 1 ? string.Empty : "s")}"
                     : "0 failures",
+                RecentTrendText = ToTrendText(trendAnalysis.TrendKind, status),
+                RecentTrendBadgeClass = ToTrendBadgeClass(trendAnalysis.TrendKind),
+                RecentTrendSummary = BuildTrendSummary(trendAnalysis, recentMetrics),
+                RecentLastChangeText = recentMetrics.LastStatusChangeUtc is DateTimeOffset lastStatusChangeUtc
+                    ? FormatDateTime(lastStatusChangeUtc)
+                    : "No recent change",
                 RecentIndicators = recentSamples
                     .OrderByDescending(static sample => sample.CheckedUtc)
                     .Take(8)
@@ -337,6 +352,55 @@ public class IndexModel : PageModel
                 "Degraded" => "sample-indicator-degraded",
                 "Unhealthy" => "sample-indicator-unhealthy",
                 _ => "sample-indicator-unknown"
+            };
+        }
+
+        private static string ToTrendText(RecentPollTrendKind trendKind, string currentStatus)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "Failing",
+                RecentPollTrendKind.Improving => "Improving",
+                RecentPollTrendKind.Worsening => "Worsening",
+                RecentPollTrendKind.Flapping => "Flapping",
+                RecentPollTrendKind.Stable => $"Stable {currentStatus}",
+                _ => "Awaiting trend"
+            };
+        }
+
+        private static string ToTrendBadgeClass(RecentPollTrendKind trendKind)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "badge-danger",
+                RecentPollTrendKind.Improving => "badge-success",
+                RecentPollTrendKind.Worsening => "badge-warning",
+                RecentPollTrendKind.Flapping => "badge-danger",
+                RecentPollTrendKind.Stable => "badge-info",
+                _ => "badge-light"
+            };
+        }
+
+        private static string BuildTrendSummary(RecentPollTrendAnalysis trendAnalysis, RecentPollSampleMetrics recentMetrics)
+        {
+            if (!recentMetrics.HasSamples)
+            {
+                return "No recent samples retained yet.";
+            }
+
+            return trendAnalysis.TrendKind switch
+            {
+                RecentPollTrendKind.Failing =>
+                    "Recent samples are consistently failing and need attention.",
+                RecentPollTrendKind.Improving =>
+                    $"Recent samples are recovering across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Worsening =>
+                    $"Recent samples are trending worse across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Flapping =>
+                    $"Recent samples have changed status {trendAnalysis.Transitions.Count} times and may be flapping.",
+                RecentPollTrendKind.Stable =>
+                    "Recent samples are holding a consistent status.",
+                _ => "Need at least two retained samples to detect a trend."
             };
         }
     }

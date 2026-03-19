@@ -156,6 +156,97 @@ public sealed class IndexModelTests
     }
 
     [Fact]
+    public void OnGet_ExposesRecentTrendSummaryForEndpointRows()
+    {
+        var config = CreateConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+
+        store.Upsert(new ApiHealthDashboard.Domain.EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Unhealthy",
+            RecentSamples =
+            [
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 0, 0, TimeSpan.Zero),
+                    Status = "Healthy",
+                    DurationMs = 110,
+                    ResultKind = "Success"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 1, 0, TimeSpan.Zero),
+                    Status = "Degraded",
+                    DurationMs = 230,
+                    ResultKind = "Success",
+                    ErrorSummary = "Slow dependency"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 2, 0, TimeSpan.Zero),
+                    Status = "Unhealthy",
+                    DurationMs = 410,
+                    ResultKind = "HttpError",
+                    ErrorSummary = "503"
+                }
+            ]
+        });
+
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        var endpoint = Assert.Single(model.Endpoints.Where(static endpoint => endpoint.Id == "orders-api"));
+        Assert.Equal("Worsening", endpoint.RecentTrendText);
+        Assert.Equal("badge-warning", endpoint.RecentTrendBadgeClass);
+        Assert.Equal("2026-03-19 00:02:00 UTC", endpoint.RecentLastChangeText);
+    }
+
+    [Fact]
+    public void OnGet_AllFailedUnknownSamples_AreShownAsFailingTrend()
+    {
+        var config = CreateConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+
+        store.Upsert(new ApiHealthDashboard.Domain.EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Unknown",
+            LastError = "Connection refused",
+            RecentSamples =
+            [
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 1, 0, 0, TimeSpan.Zero),
+                    Status = "Unknown",
+                    DurationMs = 200,
+                    ResultKind = "Timeout",
+                    ErrorSummary = "Timed out"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 1, 1, 0, TimeSpan.Zero),
+                    Status = "Unknown",
+                    DurationMs = 210,
+                    ResultKind = "NetworkError",
+                    ErrorSummary = "Connection refused"
+                }
+            ]
+        });
+
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        var endpoint = Assert.Single(model.Endpoints.Where(static endpoint => endpoint.Id == "orders-api"));
+        Assert.Equal("Failing", endpoint.RecentTrendText);
+        Assert.Equal("badge-danger", endpoint.RecentTrendBadgeClass);
+    }
+
+    [Fact]
     public void OnGet_WithNoConfiguredEndpoints_ExposesEmptyDashboardState()
     {
         var config = new DashboardConfig();

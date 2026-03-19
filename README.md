@@ -33,6 +33,7 @@ Implemented so far:
 - Post-v1: per-endpoint current-state persistence with compact JSON files
 - Post-v1: runtime-state cleanup and retention settings for orphaned persisted state files
 - Post-v1: recent poll sample retention with derived dashboard and details metrics
+- Post-v1: mini trend visuals and short status history from retained runtime samples
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -215,6 +216,7 @@ Current dashboard behavior:
 - refreshes the live dashboard section with same-origin timed GET requests instead of reloading the whole page
 - briefly flashes endpoint rows when they are manually refreshed or when background polling updates change the rendered row state
 - uses different row flash cues for routine updates, improving health transitions, and worsening health transitions
+- shows a compact recent-status indicator strip plus a short trend label for each endpoint
 - sorts endpoint summaries and active issues by endpoint priority before name
 - renders a live endpoint table with last check, duration, recent signal metrics, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
@@ -255,7 +257,8 @@ Current details-page behavior:
 - shows endpoint metadata including enabled state, priority, frequency, timeout, and masked request headers
 - shows request filter configuration for included and excluded checks
 - summarizes the latest poll with status, timings, retrieved timestamp, and current error
-- shows retained recent sample metrics including success rate, failure count, average duration, last status change, and recent activity
+- shows retained recent sample metrics including success rate, failure count, average duration, last status change, and a short trend summary
+- shows a short recent status history with the latest observed status transitions
 - renders top-level and nested health checks recursively with native expand and collapse support
 - surfaces snapshot metadata captured from the parsed response
 - shows the raw payload section only when enabled in configuration
@@ -505,8 +508,6 @@ Test file:
 ## Future Plans
 
 These are planned enhancements after the current v1 path:
-- next up: add mini trend visuals and short status history views based on the retained recent poll samples already captured in runtime state
-- optionally add short status history and mini trends so the dashboard can show recent health changes instead of only the latest snapshot
 - add configurable retention controls for future persisted history files once trend capture is introduced
 - optionally add per-endpoint history files once the embedded recent-sample window is no longer sufficient
 - optionally allow email sending, either through direct SMTP configuration or by calling an external API

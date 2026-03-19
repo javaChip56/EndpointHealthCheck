@@ -212,6 +212,11 @@
                                                     <span class="sample-indicator @indicator.BadgeClass" title="@indicator.Summary"></span>
                                                 }
                                             </div>
+                                            <div class="dashboard-trend-summary">
+                                                <span class="badge @endpoint.RecentTrendBadgeClass">@endpoint.RecentTrendText</span>
+                                                <small class="text-muted">@endpoint.RecentLastChangeText</small>
+                                            </div>
+                                            <div><small class="text-muted">@endpoint.RecentTrendSummary</small></div>
                                             <div><small class="text-muted">@endpoint.RecentSuccessRateText</small></div>
                                             <div><small class="text-muted">@endpoint.RecentAverageDurationText • @endpoint.RecentFailureCountText</small></div>
                                         }

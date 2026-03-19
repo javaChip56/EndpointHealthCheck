@@ -153,6 +153,12 @@ public class DetailsModel : PageModel
 
         public string LastStatusChangeText { get; init; } = "No recent change";
 
+        public string RecentTrendText { get; init; } = "Awaiting trend";
+
+        public string RecentTrendBadgeClass { get; init; } = "badge-light";
+
+        public string RecentTrendSummary { get; init; } = "Need more samples to detect a trend.";
+
         public string? ErrorText { get; init; }
 
         public string ErrorSummary => string.IsNullOrWhiteSpace(ErrorText) ? "None" : ErrorText;
@@ -195,6 +201,10 @@ public class DetailsModel : PageModel
 
         public IReadOnlyList<RecentPollSampleViewModel> RecentSamples { get; init; } = [];
 
+        public IReadOnlyList<StatusTransitionViewModel> RecentStatusTransitions { get; init; } = [];
+
+        public bool HasStatusTransitions => RecentStatusTransitions.Count > 0;
+
         public static EndpointDetailsViewModel From(
             EndpointConfig endpoint,
             EndpointState? state,
@@ -209,6 +219,7 @@ public class DetailsModel : PageModel
                 .Select(static sample => sample.Clone())
                 .ToArray() ?? [];
             var recentMetrics = RecentPollSampleMetricsCalculator.Calculate(recentSamples);
+            var trendAnalysis = RecentPollTrendAnalyzer.Analyze(recentSamples);
 
             return new EndpointDetailsViewModel
             {
@@ -242,6 +253,9 @@ public class DetailsModel : PageModel
                 LastStatusChangeText = recentMetrics.LastStatusChangeUtc is DateTimeOffset lastStatusChangeUtc
                     ? FormatDateTime(lastStatusChangeUtc)
                     : "No recent change",
+                RecentTrendText = ToTrendText(trendAnalysis.TrendKind, status),
+                RecentTrendBadgeClass = ToTrendBadgeClass(trendAnalysis.TrendKind),
+                RecentTrendSummary = BuildTrendSummary(trendAnalysis, recentMetrics),
                 ErrorText = state?.LastError,
                 Headers = endpoint.Headers
                     .OrderBy(static header => header.Key, StringComparer.OrdinalIgnoreCase)
@@ -275,6 +289,11 @@ public class DetailsModel : PageModel
                 UnknownCheckCount = flattenedNodes.Count(static node => node.Status is not ("Healthy" or "Degraded" or "Unhealthy")),
                 RawPayload = showRawPayload ? FormatPayloadPreview(state?.Snapshot?.RawPayload) : null,
                 ShowRawPayload = showRawPayload,
+                RecentStatusTransitions = trendAnalysis.Transitions
+                    .OrderByDescending(static transition => transition.ChangedUtc)
+                    .Take(6)
+                    .Select(CreateStatusTransitionViewModel)
+                    .ToArray(),
                 RecentSamples = recentSamples
                     .OrderByDescending(static sample => sample.CheckedUtc)
                     .Take(10)
@@ -384,6 +403,7 @@ public class DetailsModel : PageModel
                 CheckedText = FormatDateTime(sample.CheckedUtc),
                 Status = sample.Status,
                 StatusBadgeClass = ToBadgeClass(sample.Status),
+                IndicatorBadgeClass = ToRecentIndicatorClass(sample),
                 ResultKind = sample.ResultKind,
                 ResultKindBadgeClass = ToResultKindBadgeClass(sample),
                 DurationText = $"{sample.DurationMs} ms",
@@ -407,6 +427,84 @@ public class DetailsModel : PageModel
                 "HttpError" => "badge-danger",
                 "EmptyResponse" => "badge-warning",
                 _ => "badge-secondary"
+            };
+        }
+
+        private static string ToRecentIndicatorClass(RecentPollSample sample)
+        {
+            if (!string.IsNullOrWhiteSpace(sample.ErrorSummary) ||
+                !string.Equals(sample.ResultKind, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                return "sample-indicator-failure";
+            }
+
+            return sample.Status switch
+            {
+                "Healthy" => "sample-indicator-healthy",
+                "Degraded" => "sample-indicator-degraded",
+                "Unhealthy" => "sample-indicator-unhealthy",
+                _ => "sample-indicator-unknown"
+            };
+        }
+
+        private static StatusTransitionViewModel CreateStatusTransitionViewModel(RecentPollStatusTransition transition)
+        {
+            return new StatusTransitionViewModel
+            {
+                FromStatus = transition.FromStatus,
+                FromStatusBadgeClass = ToBadgeClass(transition.FromStatus),
+                ToStatus = transition.ToStatus,
+                ToStatusBadgeClass = ToBadgeClass(transition.ToStatus),
+                ChangedText = FormatDateTime(transition.ChangedUtc)
+            };
+        }
+
+        private static string ToTrendText(RecentPollTrendKind trendKind, string currentStatus)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "Failing",
+                RecentPollTrendKind.Improving => "Improving",
+                RecentPollTrendKind.Worsening => "Worsening",
+                RecentPollTrendKind.Flapping => "Flapping",
+                RecentPollTrendKind.Stable => $"Stable {currentStatus}",
+                _ => "Awaiting trend"
+            };
+        }
+
+        private static string ToTrendBadgeClass(RecentPollTrendKind trendKind)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "badge-danger",
+                RecentPollTrendKind.Improving => "badge-success",
+                RecentPollTrendKind.Worsening => "badge-warning",
+                RecentPollTrendKind.Flapping => "badge-danger",
+                RecentPollTrendKind.Stable => "badge-info",
+                _ => "badge-light"
+            };
+        }
+
+        private static string BuildTrendSummary(RecentPollTrendAnalysis trendAnalysis, RecentPollSampleMetrics recentMetrics)
+        {
+            if (!recentMetrics.HasSamples)
+            {
+                return "No recent samples retained yet.";
+            }
+
+            return trendAnalysis.TrendKind switch
+            {
+                RecentPollTrendKind.Failing =>
+                    "Recent checks are consistently failing and need attention.",
+                RecentPollTrendKind.Improving =>
+                    $"Recent checks are recovering across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Worsening =>
+                    $"Recent checks are trending worse across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Flapping =>
+                    $"Recent checks have changed status {trendAnalysis.Transitions.Count} times and may be unstable.",
+                RecentPollTrendKind.Stable =>
+                    "Recent checks are holding a consistent status.",
+                _ => "Need at least two retained samples to detect a trend."
             };
         }
     }
@@ -433,6 +531,8 @@ public class DetailsModel : PageModel
 
         public required string StatusBadgeClass { get; init; }
 
+        public required string IndicatorBadgeClass { get; init; }
+
         public required string ResultKind { get; init; }
 
         public required string ResultKindBadgeClass { get; init; }
@@ -442,5 +542,18 @@ public class DetailsModel : PageModel
         public required string ErrorSummary { get; init; }
 
         public bool HasError { get; init; }
+    }
+
+    public sealed class StatusTransitionViewModel
+    {
+        public required string FromStatus { get; init; }
+
+        public required string FromStatusBadgeClass { get; init; }
+
+        public required string ToStatus { get; init; }
+
+        public required string ToStatusBadgeClass { get; init; }
+
+        public required string ChangedText { get; init; }
     }
 }
