@@ -43,12 +43,16 @@ body {
   color: #fff;
 }
 
+.dashboard-hero .card-body {
+  padding: 1.1rem 1.25rem;
+}
+
 .hero-kicker {
   display: inline-block;
-  margin-bottom: 0.85rem;
-  padding: 0.35rem 0.65rem;
+  margin-bottom: 0.55rem;
+  padding: 0.25rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -56,32 +60,35 @@ body {
 }
 
 .hero-title {
-  margin-bottom: 0.75rem;
-  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.55rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .hero-copy {
-  max-width: 44rem;
+  max-width: 40rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
   color: rgba(255, 255, 255, 0.86);
 }
 
 .hero-panel {
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: 1rem;
+  margin-top: 0.5rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.85rem;
   background: rgba(7, 14, 29, 0.18);
   backdrop-filter: blur(2px);
 }
 
 .hero-stat {
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.65rem;
 }
 
 .hero-stat-label {
   display: block;
   margin-bottom: 0.1rem;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.76);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -598,7 +605,11 @@ body {
 
 @media (max-width: 991.98px) {
   .hero-title {
-    font-size: 1.65rem;
+    font-size: 1.35rem;
+  }
+
+  .dashboard-hero .card-body {
+    padding: 0.95rem 1rem;
   }
 
   .import-form-section {
