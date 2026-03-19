@@ -247,14 +247,12 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
 
         AppendRecentSample(updatedState, result);
 
-        _stateStore.Upsert(updatedState);
-
         try
         {
             await _endpointNotificationService.NotifyAsync(
                 endpoint,
                 previousState,
-                updatedState.Clone(),
+                updatedState,
                 cancellationToken);
         }
         catch (Exception ex)
@@ -264,6 +262,8 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
                 "Failed to process email notifications for endpoint {EndpointId}.",
                 endpoint.Id);
         }
+
+        _stateStore.Upsert(updatedState);
 
         _logger.LogInformation(
             "Completed {TriggerSource} poll for endpoint {EndpointId} with status {EndpointStatus}, result kind {PollResultKind}, duration {DurationMs}ms, and status code {StatusCode}.",

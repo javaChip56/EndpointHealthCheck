@@ -44,6 +44,18 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
                     ResultKind = "Success"
                 }
             ],
+            NotificationDispatches =
+            [
+                new EndpointNotificationDispatch
+                {
+                    EventType = "Alert",
+                    ConditionLabel = "Failing",
+                    Signature = "alert:failing",
+                    SentUtc = DateTimeOffset.Parse("2026-03-18T15:00:30Z"),
+                    To = ["ops@example.com"],
+                    Cc = ["lead@example.com"]
+                }
+            ],
             Snapshot = new HealthSnapshot
             {
                 OverallStatus = "Healthy",
@@ -77,6 +89,7 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         Assert.Contains("\"status\":\"Healthy\"", json);
         Assert.Contains("\"endpointId\":\"orders-api\"", json);
         Assert.Contains("\"recentSamples\":[", json);
+        Assert.Contains("\"notificationDispatches\":[", json);
         Assert.DoesNotContain("isPolling", json, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -116,6 +129,17 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
                     ErrorSummary = "Slow dependency"
                 }
             ],
+            NotificationDispatches =
+            [
+                new EndpointNotificationDispatch
+                {
+                    EventType = "Alert",
+                    ConditionLabel = "Degraded",
+                    Signature = "alert:degraded",
+                    SentUtc = DateTimeOffset.Parse("2026-03-18T16:01:00Z"),
+                    To = ["ops@example.com"]
+                }
+            ],
             Snapshot = new HealthSnapshot
             {
                 OverallStatus = "Degraded",
@@ -141,6 +165,9 @@ public sealed class FileBackedEndpointStateStoreTests : IDisposable
         Assert.False(restoredState.IsPolling);
         Assert.Equal(2, restoredState.RecentSamples.Count);
         Assert.Equal("Degraded", restoredState.RecentSamples[^1].Status);
+        var restoredDispatch = Assert.Single(restoredState.NotificationDispatches);
+        Assert.Equal("Alert", restoredDispatch.EventType);
+        Assert.Equal("Degraded", restoredDispatch.ConditionLabel);
     }
 
     [Fact]

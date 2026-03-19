@@ -18,6 +18,8 @@ public sealed class RuntimeStateOptions
 
     public int RecentSampleLimit { get; set; } = 25;
 
+    public int NotificationHistoryLimit { get; set; } = 20;
+
     public string ResolveDirectoryPath(string contentRootPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contentRootPath);
@@ -48,5 +50,10 @@ public sealed class RuntimeStateOptions
     public int GetRecentSampleLimit()
     {
         return Math.Max(RecentSampleLimit, 0);
+    }
+
+    public int GetNotificationHistoryLimit()
+    {
+        return Math.Max(NotificationHistoryLimit, 0);
     }
 }

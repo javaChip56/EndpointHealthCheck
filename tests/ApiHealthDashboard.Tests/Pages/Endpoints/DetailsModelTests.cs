@@ -114,6 +114,18 @@ public sealed class DetailsModelTests
                     ErrorSummary = "Database latency exceeded threshold."
                 }
             ],
+            NotificationDispatches =
+            [
+                new EndpointNotificationDispatch
+                {
+                    EventType = "Alert",
+                    ConditionLabel = "Degraded",
+                    Signature = "alert:degraded",
+                    SentUtc = new DateTimeOffset(2026, 03, 18, 8, 31, 0, TimeSpan.Zero),
+                    To = ["ops@example.com"],
+                    Cc = ["lead@example.com"]
+                }
+            ],
             Snapshot = new HealthSnapshot
             {
                 OverallStatus = "Degraded",
@@ -180,6 +192,9 @@ public sealed class DetailsModelTests
         Assert.Single(model.Endpoint.RecentStatusTransitions);
         Assert.Equal("Healthy", model.Endpoint.RecentStatusTransitions[0].FromStatus);
         Assert.Equal("Degraded", model.Endpoint.RecentStatusTransitions[0].ToStatus);
+        var notificationDispatch = Assert.Single(model.Endpoint.NotificationDispatches);
+        Assert.Equal("Alert", notificationDispatch.EventType);
+        Assert.Contains("ops@example.com", notificationDispatch.RecipientSummary, StringComparison.Ordinal);
         Assert.Equal(2, model.Endpoint.RecentSamples.Count);
         Assert.Equal(
             "{\n  \"status\": \"Degraded\"\n}",

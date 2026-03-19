@@ -356,6 +356,8 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
 
         public List<RecentPollSample> RecentSamples { get; set; } = new();
 
+        public List<EndpointNotificationDispatch> NotificationDispatches { get; set; } = new();
+
         public static PersistedEndpointState FromRuntimeState(EndpointState state)
         {
             return new PersistedEndpointState
@@ -368,7 +370,8 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
                 DurationMs = state.DurationMs,
                 LastError = state.LastError,
                 Snapshot = state.Snapshot?.Clone(),
-                RecentSamples = state.RecentSamples.Select(static sample => sample.Clone()).ToList()
+                RecentSamples = state.RecentSamples.Select(static sample => sample.Clone()).ToList(),
+                NotificationDispatches = state.NotificationDispatches.Select(static dispatch => dispatch.Clone()).ToList()
             };
         }
 
@@ -385,6 +388,7 @@ public sealed class FileBackedEndpointStateStore : IEndpointStateStore
                 LastError = LastError,
                 Snapshot = Snapshot?.Clone(),
                 RecentSamples = RecentSamples.Select(static sample => sample.Clone()).ToList(),
+                NotificationDispatches = NotificationDispatches.Select(static dispatch => dispatch.Clone()).ToList(),
                 IsPolling = false
             };
         }

@@ -74,6 +74,9 @@ public sealed class EndpointEmailNotificationServiceTests
         Assert.Contains("Failing", message.Subject, StringComparison.Ordinal);
         Assert.Equal(["ops@example.com", "service-owner@example.com"], message.To.OrderBy(static value => value).ToArray());
         Assert.Equal(["lead@example.com", "teamlead@example.com"], message.Cc.OrderBy(static value => value).ToArray());
+        var dispatch = Assert.Single(currentState.NotificationDispatches);
+        Assert.Equal("Alert", dispatch.EventType);
+        Assert.Equal("Failing", dispatch.ConditionLabel);
     }
 
     [Fact]
@@ -141,6 +144,7 @@ public sealed class EndpointEmailNotificationServiceTests
 
         var message = Assert.Single(sender.Messages);
         Assert.Contains("Recovery", message.Subject, StringComparison.Ordinal);
+        Assert.Single(currentState.NotificationDispatches);
     }
 
     [Fact]
@@ -186,12 +190,17 @@ public sealed class EndpointEmailNotificationServiceTests
         var message = Assert.Single(sender.Messages);
         Assert.Contains("Alert", message.Subject, StringComparison.Ordinal);
         Assert.Contains("Failing", message.Subject, StringComparison.Ordinal);
+        Assert.Single(currentState.NotificationDispatches);
     }
 
     private static EndpointEmailNotificationService CreateService(DashboardConfig config, FakeEmailSender sender)
     {
         return new EndpointEmailNotificationService(
             config,
+            new RuntimeStateOptions
+            {
+                NotificationHistoryLimit = 20
+            },
             new SmtpEmailOptions
             {
                 Enabled = true,

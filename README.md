@@ -35,6 +35,7 @@ Implemented so far:
 - Post-v1: recent poll sample retention with derived dashboard and details metrics
 - Post-v1: mini trend visuals and short status history from retained runtime samples
 - Post-v1: SMTP email notifications with dashboard defaults and per-endpoint recipients
+- Post-v1: persisted notification dispatch history in runtime state
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -127,8 +128,10 @@ Current behavior:
 - keeps active runtime state in memory for fast reads by pages and the scheduler
 - can persist the latest current state for each endpoint to a compact JSON file under a configurable runtime-state directory
 - restores persisted current state on startup for configured endpoints and resets any stale `IsPolling` flag to `false`
+- persists successful email notification dispatch history alongside endpoint runtime state so cooldown survives restarts
 - can clean up orphaned persisted state files on a configurable interval after a configurable retention window
 - retains a configurable rolling window of recent poll samples per endpoint for derived runtime metrics
+- retains a configurable rolling window of recent notification dispatch records per endpoint
 - supports get-all, get-one, upsert, and reinitialize operations
 - returns deep copies so callers cannot mutate internal store state accidentally
 - uses thread-safe locking for concurrent access
@@ -252,6 +255,7 @@ Current email notification behavior:
 - sends alert emails when an endpoint enters or changes problem state
 - can send recovery emails when an endpoint returns to a non-problem state
 - treats repeated transport failures as a `Failing` condition for alerting purposes
+- records successful dispatches in endpoint runtime state so notification cooldown and history survive restarts
 
 ### CLI Execution
 
@@ -276,6 +280,7 @@ Current details-page behavior:
 - summarizes the latest poll with status, timings, retrieved timestamp, and current error
 - shows retained recent sample metrics including success rate, failure count, average duration, last status change, and a short trend summary
 - shows a short recent status history with the latest observed status transitions
+- shows recent successful notification dispatch history with event type, condition, timestamp, and recipients
 - renders top-level and nested health checks recursively with native expand and collapse support
 - surfaces snapshot metadata captured from the parsed response
 - shows the raw payload section only when enabled in configuration
@@ -357,7 +362,7 @@ Current cleanup settings:
 - `RuntimeState:DeleteOrphanedStateFiles` to enable deletion of persisted state files that no longer belong to configured endpoints
 - `RuntimeState:OrphanedStateFileRetentionHours` to keep orphaned state files for a configurable grace period before deletion
 - `RuntimeState:RecentSampleLimit` to cap how many recent poll samples are retained per endpoint
-- `RuntimeState:RecentSampleLimit` to cap how many recent poll samples are retained per endpoint
+- `RuntimeState:NotificationHistoryLimit` to cap how many notification dispatch records are retained per endpoint
 
 You can also override it with an environment variable:
 

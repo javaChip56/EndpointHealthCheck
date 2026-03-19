@@ -304,6 +304,36 @@ else
 
                     <div class="card">
                         <div class="card-header">
+                            <h3 class="card-title">Notification History</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasNotificationDispatches)
+                            {
+                                <div class="text-muted">Successful notification dispatches will appear here after emails are sent for this endpoint.</div>
+                            }
+                            else
+                            {
+                                <div class="notification-history-list">
+                                    @foreach (var dispatch in endpoint.NotificationDispatches)
+                                    {
+                                        <div class="notification-history-item">
+                                            <div class="recent-poll-heading">
+                                                <div class="recent-poll-badges">
+                                                    <span class="badge @dispatch.EventBadgeClass">@dispatch.EventType</span>
+                                                    <span class="badge badge-light">@dispatch.ConditionLabel</span>
+                                                </div>
+                                                <div class="recent-poll-time">@dispatch.SentText</div>
+                                            </div>
+                                            <div class="small text-muted mt-2">@dispatch.RecipientSummary</div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
                             <h3 class="card-title">Snapshot Metadata</h3>
                         </div>
                         <div class="card-body">

@@ -205,6 +205,10 @@ public class DetailsModel : PageModel
 
         public bool HasStatusTransitions => RecentStatusTransitions.Count > 0;
 
+        public IReadOnlyList<NotificationDispatchViewModel> NotificationDispatches { get; init; } = [];
+
+        public bool HasNotificationDispatches => NotificationDispatches.Count > 0;
+
         public static EndpointDetailsViewModel From(
             EndpointConfig endpoint,
             EndpointState? state,
@@ -294,6 +298,11 @@ public class DetailsModel : PageModel
                     .Take(6)
                     .Select(CreateStatusTransitionViewModel)
                     .ToArray(),
+                NotificationDispatches = state?.NotificationDispatches
+                    .OrderByDescending(static dispatch => dispatch.SentUtc)
+                    .Take(8)
+                    .Select(CreateNotificationDispatchViewModel)
+                    .ToArray() ?? [],
                 RecentSamples = recentSamples
                     .OrderByDescending(static sample => sample.CheckedUtc)
                     .Take(10)
@@ -459,6 +468,31 @@ public class DetailsModel : PageModel
             };
         }
 
+        private static NotificationDispatchViewModel CreateNotificationDispatchViewModel(EndpointNotificationDispatch dispatch)
+        {
+            return new NotificationDispatchViewModel
+            {
+                EventType = dispatch.EventType,
+                EventBadgeClass = string.Equals(dispatch.EventType, "Recovery", StringComparison.OrdinalIgnoreCase)
+                    ? "badge-success"
+                    : "badge-warning",
+                ConditionLabel = dispatch.ConditionLabel,
+                SentText = FormatDateTime(dispatch.SentUtc),
+                RecipientSummary = BuildRecipientSummary(dispatch.To, dispatch.Cc)
+            };
+        }
+
+        private static string BuildRecipientSummary(IReadOnlyList<string> to, IReadOnlyList<string> cc)
+        {
+            var toSummary = to.Count == 0 ? "No direct recipients" : $"To: {string.Join(", ", to)}";
+            if (cc.Count == 0)
+            {
+                return toSummary;
+            }
+
+            return $"{toSummary} | CC: {string.Join(", ", cc)}";
+        }
+
         private static string ToTrendText(RecentPollTrendKind trendKind, string currentStatus)
         {
             return trendKind switch
@@ -555,5 +589,18 @@ public class DetailsModel : PageModel
         public required string ToStatusBadgeClass { get; init; }
 
         public required string ChangedText { get; init; }
+    }
+
+    public sealed class NotificationDispatchViewModel
+    {
+        public required string EventType { get; init; }
+
+        public required string EventBadgeClass { get; init; }
+
+        public required string ConditionLabel { get; init; }
+
+        public required string SentText { get; init; }
+
+        public required string RecipientSummary { get; init; }
     }
 }

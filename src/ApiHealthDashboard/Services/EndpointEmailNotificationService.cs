@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text;
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
@@ -11,18 +10,20 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
     private readonly DashboardConfig _dashboardConfig;
     private readonly IEmailSender _emailSender;
     private readonly ILogger<EndpointEmailNotificationService> _logger;
+    private readonly RuntimeStateOptions _runtimeStateOptions;
     private readonly SmtpEmailOptions _smtpOptions;
     private readonly TimeProvider _timeProvider;
-    private readonly ConcurrentDictionary<string, NotificationDispatchRecord> _dispatchRecords = new(StringComparer.OrdinalIgnoreCase);
 
     public EndpointEmailNotificationService(
         DashboardConfig dashboardConfig,
+        RuntimeStateOptions runtimeStateOptions,
         SmtpEmailOptions smtpOptions,
         IEmailSender emailSender,
         TimeProvider timeProvider,
         ILogger<EndpointEmailNotificationService> logger)
     {
         _dashboardConfig = dashboardConfig;
+        _runtimeStateOptions = runtimeStateOptions;
         _smtpOptions = smtpOptions;
         _emailSender = emailSender;
         _timeProvider = timeProvider;
@@ -68,7 +69,7 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
 
         var previousCondition = DescribeCondition(previousState);
         var currentCondition = DescribeCondition(currentState);
-        var hasExistingDispatchRecord = _dispatchRecords.ContainsKey(endpoint.Id);
+        var hasExistingDispatchRecord = currentState.NotificationDispatches.Count > 0;
         var notification = BuildNotificationDecision(
             notificationSettings,
             previousCondition,
@@ -79,7 +80,7 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
             return;
         }
 
-        if (IsWithinCooldown(endpoint.Id, notification.Signature, notificationSettings.CooldownMinutes))
+        if (IsWithinCooldown(currentState, notification.Signature, notificationSettings.CooldownMinutes))
         {
             _logger.LogDebug(
                 "Skipped email notification for endpoint {EndpointId} because the notification is within the configured cooldown window.",
@@ -100,9 +101,7 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
             },
             cancellationToken);
 
-        _dispatchRecords[endpoint.Id] = new NotificationDispatchRecord(
-            notification.Signature,
-            _timeProvider.GetUtcNow());
+        AppendNotificationDispatch(currentState, notification, recipients);
 
         _logger.LogInformation(
             "Sent {NotificationEventType} email notification for endpoint {EndpointId} to {ToCount} recipient(s).",
@@ -207,19 +206,49 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         return null;
     }
 
-    private bool IsWithinCooldown(string endpointId, string signature, int cooldownMinutes)
+    private bool IsWithinCooldown(EndpointState currentState, string signature, int cooldownMinutes)
     {
-        if (!_dispatchRecords.TryGetValue(endpointId, out var record))
-        {
-            return false;
-        }
+        var record = currentState.NotificationDispatches
+            .OrderByDescending(static dispatch => dispatch.SentUtc)
+            .FirstOrDefault(dispatch => string.Equals(dispatch.Signature, signature, StringComparison.OrdinalIgnoreCase));
 
-        if (!string.Equals(record.Signature, signature, StringComparison.OrdinalIgnoreCase))
+        if (record is null)
         {
             return false;
         }
 
         return (_timeProvider.GetUtcNow() - record.SentUtc) < TimeSpan.FromMinutes(cooldownMinutes);
+    }
+
+    private void AppendNotificationDispatch(
+        EndpointState currentState,
+        NotificationDecision notification,
+        NotificationRecipients recipients)
+    {
+        currentState.NotificationDispatches.Add(new EndpointNotificationDispatch
+        {
+            EventType = notification.EventType,
+            ConditionLabel = notification.SubjectLabel,
+            Signature = notification.Signature,
+            SentUtc = _timeProvider.GetUtcNow(),
+            To = [.. recipients.To],
+            Cc = [.. recipients.Cc]
+        });
+
+        var historyLimit = _runtimeStateOptions.GetNotificationHistoryLimit();
+        if (historyLimit <= 0)
+        {
+            currentState.NotificationDispatches.Clear();
+            return;
+        }
+
+        if (currentState.NotificationDispatches.Count <= historyLimit)
+        {
+            return;
+        }
+
+        var removeCount = currentState.NotificationDispatches.Count - historyLimit;
+        currentState.NotificationDispatches.RemoveRange(0, removeCount);
     }
 
     private static string BuildSubject(string subjectPrefix, string eventType, string endpointName, string label)
@@ -264,8 +293,6 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
 
         return builder.ToString().TrimEnd();
     }
-
-    private sealed record NotificationDispatchRecord(string Signature, DateTimeOffset SentUtc);
 
     private sealed record NotificationRecipients(IReadOnlyList<string> To, IReadOnlyList<string> Cc);
 
