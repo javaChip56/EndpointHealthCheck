@@ -79,7 +79,7 @@
 </div>
 
 <div class="row">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
         <div class="card">
             <div class="card-header border-0">
                 <h3 class="card-title">Endpoint Summary</h3>
@@ -150,8 +150,30 @@
                                         endpoint.StatusDescription,
                                         endpoint.ErrorSummary
                                     }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+                                var rowSignature = string.Join(
+                                    '|',
+                                    new[]
+                                    {
+                                        endpoint.Status,
+                                        endpoint.StatusDescription,
+                                        endpoint.Priority,
+                                        endpoint.LastCheckedText,
+                                        endpoint.LastSuccessfulText,
+                                        endpoint.DurationText,
+                                        endpoint.RecentSuccessRateText,
+                                        endpoint.RecentAverageDurationText,
+                                        endpoint.RecentFailureCountText,
+                                        endpoint.ErrorSummary,
+                                        endpoint.Enabled ? "enabled" : "disabled",
+                                        endpoint.IsPolling ? "polling" : "idle",
+                                        endpoint.HasRecentSamples ? "samples" : "no-samples",
+                                        string.Join(';', endpoint.RecentIndicators.Select(static indicator => indicator.Summary))
+                                    }.Where(static value => !string.IsNullOrWhiteSpace(value)));
 
-                                <tr data-endpoint-search-row data-endpoint-search-text="@searchText">
+                                <tr data-endpoint-search-row
+                                    data-endpoint-search-text="@searchText"
+                                    data-endpoint-row-id="@endpoint.Id"
+                                    data-endpoint-row-signature="@rowSignature">
                                     <td>
                                         <div class="font-weight-semibold">@endpoint.Name</div>
                                         @if (endpoint.ShowIdHint)
@@ -205,7 +227,7 @@
                                         }
                                     </td>
                                     <td class="text-nowrap">
-                                        <form method="post" asp-page-handler="RefreshEndpoint" class="d-inline">
+                                        <form method="post" asp-page-handler="RefreshEndpoint" class="d-inline" data-endpoint-refresh-form>
                                             <input type="hidden" name="endpointId" value="@endpoint.Id" />
                                             <button type="submit" class="btn btn-sm btn-outline-primary" title="Refresh endpoint">
                                                 <i class="fas fa-sync-alt"></i>
@@ -227,7 +249,7 @@
         </div>
     </div>
 
-    <div class="col-lg-4">
+    <div class="col-lg-3">
         <div class="card card-outline card-primary">
             <div class="card-header">
                 <h3 class="card-title">Health Distribution</h3>
