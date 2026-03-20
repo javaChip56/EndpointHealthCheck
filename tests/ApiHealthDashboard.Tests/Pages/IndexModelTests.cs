@@ -85,6 +85,8 @@ public sealed class IndexModelTests
     public void OnGet_CalculatesMixedStatusCountersAndProblemEndpoints()
     {
         var config = CreateConfig();
+        config.Endpoints[0].Priority = EndpointPriority.High;
+        config.Endpoints[1].Priority = EndpointPriority.Critical;
         var store = new InMemoryEndpointStateStore(config.Endpoints);
 
         store.Upsert(new ApiHealthDashboard.Domain.EndpointState
@@ -99,7 +101,25 @@ public sealed class IndexModelTests
             EndpointId = "billing-api",
             EndpointName = "Billing API",
             Status = "Degraded",
-            LastError = "Dependency timeout"
+            LastError = "Dependency timeout",
+            RecentSamples =
+            [
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 0, 0, TimeSpan.Zero),
+                    Status = "Healthy",
+                    DurationMs = 120,
+                    ResultKind = "Success"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 1, 0, TimeSpan.Zero),
+                    Status = "Degraded",
+                    DurationMs = 340,
+                    ResultKind = "Success",
+                    ErrorSummary = "Dependency timeout"
+                }
+            ]
         });
 
         var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
@@ -115,6 +135,115 @@ public sealed class IndexModelTests
         Assert.Equal(0, model.Counters.Unknown);
         Assert.Single(model.ProblemEndpoints);
         Assert.Equal("billing-api", model.ProblemEndpoints[0].Id);
+        Assert.Equal(EndpointPriority.Critical, model.ProblemEndpoints[0].Priority);
+        Assert.Equal("50% success", model.ProblemEndpoints[0].RecentSuccessRateText);
+        Assert.Equal("230 ms avg", model.ProblemEndpoints[0].RecentAverageDurationText);
+    }
+
+    [Fact]
+    public void OnGet_SortsEndpointsByPriorityBeforeName()
+    {
+        var config = CreateConfig();
+        config.Endpoints[0].Priority = EndpointPriority.Low;
+        config.Endpoints[1].Priority = EndpointPriority.Critical;
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        Assert.Equal("billing-api", model.Endpoints[0].Id);
+        Assert.Equal(EndpointPriority.Critical, model.Endpoints[0].Priority);
+    }
+
+    [Fact]
+    public void OnGet_ExposesRecentTrendSummaryForEndpointRows()
+    {
+        var config = CreateConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+
+        store.Upsert(new ApiHealthDashboard.Domain.EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Unhealthy",
+            RecentSamples =
+            [
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 0, 0, TimeSpan.Zero),
+                    Status = "Healthy",
+                    DurationMs = 110,
+                    ResultKind = "Success"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 1, 0, TimeSpan.Zero),
+                    Status = "Degraded",
+                    DurationMs = 230,
+                    ResultKind = "Success",
+                    ErrorSummary = "Slow dependency"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 2, 0, TimeSpan.Zero),
+                    Status = "Unhealthy",
+                    DurationMs = 410,
+                    ResultKind = "HttpError",
+                    ErrorSummary = "503"
+                }
+            ]
+        });
+
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        var endpoint = Assert.Single(model.Endpoints.Where(static endpoint => endpoint.Id == "orders-api"));
+        Assert.Equal("Worsening", endpoint.RecentTrendText);
+        Assert.Equal("badge-warning", endpoint.RecentTrendBadgeClass);
+        Assert.Equal("2026-03-19 00:02:00 UTC", endpoint.RecentLastChangeText);
+    }
+
+    [Fact]
+    public void OnGet_AllFailedUnknownSamples_AreShownAsFailingTrend()
+    {
+        var config = CreateConfig();
+        var store = new InMemoryEndpointStateStore(config.Endpoints);
+
+        store.Upsert(new ApiHealthDashboard.Domain.EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Unknown",
+            LastError = "Connection refused",
+            RecentSamples =
+            [
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 1, 0, 0, TimeSpan.Zero),
+                    Status = "Unknown",
+                    DurationMs = 200,
+                    ResultKind = "Timeout",
+                    ErrorSummary = "Timed out"
+                },
+                new ApiHealthDashboard.Domain.RecentPollSample
+                {
+                    CheckedUtc = new DateTimeOffset(2026, 03, 19, 1, 1, 0, TimeSpan.Zero),
+                    Status = "Unknown",
+                    DurationMs = 210,
+                    ResultKind = "NetworkError",
+                    ErrorSummary = "Connection refused"
+                }
+            ]
+        });
+
+        var model = new IndexModel(config, store, new StubEndpointScheduler(), NullLogger<IndexModel>.Instance);
+
+        model.OnGet();
+
+        var endpoint = Assert.Single(model.Endpoints.Where(static endpoint => endpoint.Id == "orders-api"));
+        Assert.Equal("Failing", endpoint.RecentTrendText);
+        Assert.Equal("badge-danger", endpoint.RecentTrendBadgeClass);
     }
 
     [Fact]
@@ -190,6 +319,7 @@ public sealed class IndexModelTests
                     Id = "orders-api",
                     Name = "Orders API",
                     Url = "https://orders.example.com/health",
+                    Priority = EndpointPriority.Normal,
                     Enabled = true,
                     FrequencySeconds = 30
                 },
@@ -198,6 +328,7 @@ public sealed class IndexModelTests
                     Id = "billing-api",
                     Name = "Billing API",
                     Url = "https://billing.example.com/health",
+                    Priority = EndpointPriority.Normal,
                     Enabled = true,
                     FrequencySeconds = 60
                 }

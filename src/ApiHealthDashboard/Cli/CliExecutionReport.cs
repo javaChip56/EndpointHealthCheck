@@ -1,4 +1,5 @@
 using System.Xml.Serialization;
+using ApiHealthDashboard.Configuration;
 
 namespace ApiHealthDashboard.Cli;
 
@@ -60,6 +61,8 @@ public sealed class CliEndpointExecutionReport
     public string Url { get; set; } = string.Empty;
 
     public bool Enabled { get; set; }
+
+    public string Priority { get; set; } = EndpointPriority.Normal;
 
     public int FrequencySeconds { get; set; }
 

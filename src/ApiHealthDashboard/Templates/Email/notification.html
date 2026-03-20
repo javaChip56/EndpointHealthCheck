@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{Subject}}</title>
+</head>
+<body style="margin:0;padding:24px;background:#f4f7fb;font-family:Segoe UI,Arial,sans-serif;color:#162033;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #d8e1ee;border-radius:12px;">
+    <tr>
+      <td style="padding:20px 24px;border-bottom:1px solid #e6edf7;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#55708f;">ApiHealthDashboard</div>
+        <div style="margin-top:6px;font-size:22px;font-weight:700;color:#162033;">{{Subject}}</div>
+        <div style="margin-top:8px;font-size:14px;line-height:1.5;color:#4c617a;">{{SummaryText}}</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">Endpoint</td>
+            <td style="padding:0 0 10px 0;font-size:14px;font-weight:600;color:#162033;">{{EndpointName}} ({{EndpointId}})</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">URL</td>
+            <td style="padding:0 0 10px 0;font-size:14px;color:#162033;">{{EndpointUrl}}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">Priority</td>
+            <td style="padding:0 0 10px 0;font-size:14px;color:#162033;">{{Priority}}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">Event</td>
+            <td style="padding:0 0 10px 0;font-size:14px;font-weight:600;color:#162033;">{{EventType}}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">Current status</td>
+            <td style="padding:0 0 10px 0;font-size:14px;color:#162033;">{{CurrentStatus}}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">Current trend</td>
+            <td style="padding:0 0 10px 0;font-size:14px;color:#162033;">{{CurrentTrend}}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">Previous condition</td>
+            <td style="padding:0 0 10px 0;font-size:14px;color:#162033;">{{PreviousCondition}}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 0 10px 0;font-size:13px;color:#55708f;">Error</td>
+            <td style="padding:0 0 10px 0;font-size:14px;color:#162033;">{{ErrorSummary}}</td>
+          </tr>
+          <tr>
+            <td style="padding:0;font-size:13px;color:#55708f;">Checked</td>
+            <td style="padding:0;font-size:14px;color:#162033;">{{CheckedUtc}}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -79,7 +79,7 @@
 </div>
 
 <div class="row">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
         <div class="card">
             <div class="card-header border-0">
                 <h3 class="card-title">Endpoint Summary</h3>
@@ -93,7 +93,7 @@
                             </div>
                             <input type="search"
                                    class="form-control"
-                                   placeholder="Search name, id, status, or error"
+                                   placeholder="Search name, id, priority, status, or error"
                                    aria-label="Search endpoints"
                                    data-endpoint-search-input />
                         </div>
@@ -126,9 +126,11 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Status</th>
+                                <th>Priority</th>
                                 <th>Last Checked</th>
                                 <th>Last Successful</th>
                                 <th>Duration</th>
+                                <th>Recent Signal</th>
                                 <th>Frequency</th>
                                 <th>Error</th>
                                 <th>Actions</th>
@@ -144,11 +146,35 @@
                                         endpoint.Name,
                                         endpoint.Id,
                                         endpoint.Status,
+                                        endpoint.Priority,
                                         endpoint.StatusDescription,
                                         endpoint.ErrorSummary
                                     }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+                                var rowSignature = string.Join(
+                                    '|',
+                                    new[]
+                                    {
+                                        endpoint.Status,
+                                        endpoint.StatusDescription,
+                                        endpoint.Priority,
+                                        endpoint.LastCheckedText,
+                                        endpoint.LastSuccessfulText,
+                                        endpoint.DurationText,
+                                        endpoint.RecentSuccessRateText,
+                                        endpoint.RecentAverageDurationText,
+                                        endpoint.RecentFailureCountText,
+                                        endpoint.ErrorSummary,
+                                        endpoint.Enabled ? "enabled" : "disabled",
+                                        endpoint.IsPolling ? "polling" : "idle",
+                                        endpoint.HasRecentSamples ? "samples" : "no-samples",
+                                        string.Join(';', endpoint.RecentIndicators.Select(static indicator => indicator.Summary))
+                                    }.Where(static value => !string.IsNullOrWhiteSpace(value)));
 
-                                <tr data-endpoint-search-row data-endpoint-search-text="@searchText">
+                                <tr data-endpoint-search-row
+                                    data-endpoint-search-text="@searchText"
+                                    data-endpoint-row-id="@endpoint.Id"
+                                    data-endpoint-row-status="@endpoint.Status"
+                                    data-endpoint-row-signature="@rowSignature">
                                     <td>
                                         <div class="font-weight-semibold">@endpoint.Name</div>
                                         @if (endpoint.ShowIdHint)
@@ -167,9 +193,34 @@
                                             <div><small class="text-muted">@endpoint.StatusDescription</small></div>
                                         }
                                     </td>
+                                    <td>
+                                        <span class="badge @endpoint.PriorityBadgeClass">@endpoint.Priority</span>
+                                    </td>
                                     <td>@endpoint.LastCheckedText</td>
                                     <td>@endpoint.LastSuccessfulText</td>
                                     <td>@endpoint.DurationText</td>
+                                    <td class="dashboard-recent-cell">
+                                        @if (!endpoint.HasRecentSamples)
+                                        {
+                                            <span class="text-muted">No recent samples</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="sample-indicator-strip" aria-label="Recent poll signal">
+                                                @foreach (var indicator in endpoint.RecentIndicators)
+                                                {
+                                                    <span class="sample-indicator @indicator.BadgeClass" title="@indicator.Summary"></span>
+                                                }
+                                            </div>
+                                            <div class="dashboard-trend-summary">
+                                                <span class="badge @endpoint.RecentTrendBadgeClass">@endpoint.RecentTrendText</span>
+                                                <small class="text-muted">@endpoint.RecentLastChangeText</small>
+                                            </div>
+                                            <div><small class="text-muted">@endpoint.RecentTrendSummary</small></div>
+                                            <div><small class="text-muted">@endpoint.RecentSuccessRateText</small></div>
+                                            <div><small class="text-muted">@endpoint.RecentAverageDurationText • @endpoint.RecentFailureCountText</small></div>
+                                        }
+                                    </td>
                                     <td>@endpoint.FrequencyText</td>
                                     <td class="dashboard-error-cell">
                                         @if (string.IsNullOrWhiteSpace(endpoint.ErrorText))
@@ -182,7 +233,7 @@
                                         }
                                     </td>
                                     <td class="text-nowrap">
-                                        <form method="post" asp-page-handler="RefreshEndpoint" class="d-inline">
+                                        <form method="post" asp-page-handler="RefreshEndpoint" class="d-inline" data-endpoint-refresh-form>
                                             <input type="hidden" name="endpointId" value="@endpoint.Id" />
                                             <button type="submit" class="btn btn-sm btn-outline-primary" title="Refresh endpoint">
                                                 <i class="fas fa-sync-alt"></i>
@@ -193,7 +244,7 @@
                                 </tr>
                             }
                             <tr data-endpoint-search-empty hidden>
-                                <td colspan="8" class="text-center text-muted py-4">
+                                <td colspan="10" class="text-center text-muted py-4">
                                     No endpoints match your search.
                                 </td>
                             </tr>
@@ -204,7 +255,7 @@
         </div>
     </div>
 
-    <div class="col-lg-4">
+    <div class="col-lg-3">
         <div class="card card-outline card-primary">
             <div class="card-header">
                 <h3 class="card-title">Health Distribution</h3>
@@ -259,6 +310,7 @@
                                 <span class="text">
                                     <strong>@endpoint.Name</strong>
                                     <span class="badge @endpoint.StatusBadgeClass ml-2">@endpoint.Status</span>
+                                    <span class="badge @endpoint.PriorityBadgeClass ml-2">@endpoint.Priority</span>
                                 </span>
                                 <div class="text-muted small mt-1">Last checked: @endpoint.LastCheckedText</div>
                                 @if (!string.IsNullOrWhiteSpace(endpoint.ErrorText))

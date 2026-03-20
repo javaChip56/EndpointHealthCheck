@@ -21,8 +21,11 @@ public sealed class EndpointImportServiceTests
                     Id = "orders-api",
                     Name = "Orders API",
                     Url = "https://orders.example.com/health",
+                    Priority = EndpointPriority.High,
                     Enabled = true,
-                    FrequencySeconds = 60
+                    FrequencySeconds = 60,
+                    NotificationEmails = ["ops@example.com"],
+                    NotificationCc = ["lead@example.com"]
                 }
             ]
         };
@@ -59,13 +62,19 @@ public sealed class EndpointImportServiceTests
             {
                 Url = "https://orders.example.com/health",
                 FrequencySeconds = 30,
-                IncludeDiscoveredChecks = true
+                IncludeDiscoveredChecks = true,
+                NotificationCcText = "override@example.com"
             },
             CancellationToken.None);
 
         Assert.Equal("orders-api", result.SuggestedEndpoint.Id);
         Assert.Equal("Orders API", result.SuggestedEndpoint.Name);
+        Assert.Equal(EndpointPriority.High, result.SuggestedEndpoint.Priority);
         Assert.True(result.HasExistingMatch);
+        Assert.Contains("priority: 'High'", result.GeneratedYaml, StringComparison.Ordinal);
+        Assert.Contains("notificationEmails:", result.GeneratedYaml, StringComparison.Ordinal);
+        Assert.Contains("'ops@example.com'", result.GeneratedYaml, StringComparison.Ordinal);
+        Assert.Contains("'override@example.com'", result.GeneratedYaml, StringComparison.Ordinal);
         Assert.Contains("includeChecks:", result.GeneratedYaml, StringComparison.Ordinal);
         Assert.Contains("'database'", result.GeneratedYaml, StringComparison.Ordinal);
         Assert.Equal(["cache", "database"], result.TopLevelCheckNames);
@@ -118,6 +127,7 @@ public sealed class EndpointImportServiceTests
             CancellationToken.None);
 
         Assert.False(result.HasExistingMatch);
+        Assert.Equal(EndpointPriority.Normal, result.SuggestedEndpoint.Priority);
         Assert.True(result.ResponsePreviewWasTruncated);
         Assert.Equal(12000, result.ResponsePreview.Length);
         Assert.Empty(result.DiffLines);
@@ -150,6 +160,37 @@ public sealed class EndpointImportServiceTests
 
         Assert.Contains("\n", result.ResponsePreview.Replace("\r\n", "\n", StringComparison.Ordinal), StringComparison.Ordinal);
         Assert.Contains("\"status\": \"Healthy\"", result.ResponsePreview, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportAsync_WithNotificationRecipients_AddsThemToSuggestedEndpoint()
+    {
+        var service = new EndpointImportService(
+            new DashboardConfig(),
+            new StubEndpointPoller(new PollResult
+            {
+                Kind = PollResultKind.Success,
+                DurationMs = 25,
+                ResponseBody = "{\"status\":\"Healthy\"}"
+            }),
+            new StubHealthResponseParser(new HealthSnapshot
+            {
+                OverallStatus = "Healthy"
+            }),
+            NullLogger<EndpointImportService>.Instance);
+
+        var result = await service.ImportAsync(
+            new EndpointImportRequest
+            {
+                Url = "https://orders.example.com/health",
+                FrequencySeconds = 180,
+                NotificationEmailsText = "ops@example.com; oncall@example.com",
+                NotificationCcText = "lead@example.com"
+            },
+            CancellationToken.None);
+
+        Assert.Equal(["oncall@example.com", "ops@example.com"], result.SuggestedEndpoint.NotificationEmails.OrderBy(static value => value).ToArray());
+        Assert.Equal(["lead@example.com"], result.SuggestedEndpoint.NotificationCc);
     }
 
     [Fact]

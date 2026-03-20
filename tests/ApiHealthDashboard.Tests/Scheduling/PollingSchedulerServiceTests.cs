@@ -54,6 +54,10 @@ public sealed class PollingSchedulerServiceTests
         Assert.Null(state.LastError);
         Assert.NotNull(state.Snapshot);
         Assert.Equal("Healthy", state.Snapshot!.OverallStatus);
+        var recentSample = Assert.Single(state.RecentSamples);
+        Assert.Equal("Healthy", recentSample.Status);
+        Assert.Equal("Success", recentSample.ResultKind);
+        Assert.Null(recentSample.ErrorSummary);
     }
 
     [Fact]
@@ -293,19 +297,95 @@ public sealed class PollingSchedulerServiceTests
         Assert.Equal("Unknown", state!.Status);
         Assert.Equal("Failed to parse health response: Malformed nested payload", state.LastError);
         Assert.NotNull(state.Snapshot);
+        var recentSample = Assert.Single(state.RecentSamples);
+        Assert.Equal("Unknown", recentSample.Status);
+        Assert.Equal("Success", recentSample.ResultKind);
+        Assert.Equal("Failed to parse health response: Malformed nested payload", recentSample.ErrorSummary);
+    }
+
+    [Fact]
+    public async Task RefreshEndpointAsync_TrimsRecentSamplesToConfiguredLimit()
+    {
+        var endpoint = new EndpointConfig
+        {
+            Id = "orders-api",
+            Name = "Orders API",
+            Url = "https://orders.example.com/health",
+            Enabled = true,
+            FrequencySeconds = 30
+        };
+
+        var store = new InMemoryEndpointStateStore([endpoint]);
+        store.Upsert(new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Healthy",
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T00:00:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 10,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T00:01:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 11,
+                    ResultKind = "Success"
+                }
+            ]
+        });
+
+        var scheduler = CreateScheduler(
+            new DashboardConfig { Endpoints = [endpoint] },
+            store,
+            new DelegateEndpointPoller((_, _) => Task.FromResult(new PollResult
+            {
+                Kind = PollResultKind.Timeout,
+                CheckedUtc = DateTimeOffset.Parse("2026-03-19T00:02:00Z"),
+                DurationMs = 999,
+                ErrorMessage = "Timed out"
+            })),
+            new DelegateHealthResponseParser((_, _, durationMs) => new HealthSnapshot
+            {
+                OverallStatus = "Healthy",
+                RetrievedUtc = DateTimeOffset.UtcNow,
+                DurationMs = durationMs
+            }),
+            new RuntimeStateOptions
+            {
+                RecentSampleLimit = 2
+            });
+
+        await scheduler.RefreshEndpointAsync("orders-api");
+
+        var state = store.Get("orders-api");
+
+        Assert.NotNull(state);
+        Assert.Equal(2, state!.RecentSamples.Count);
+        Assert.Equal(DateTimeOffset.Parse("2026-03-19T00:01:00Z"), state.RecentSamples[0].CheckedUtc);
+        Assert.Equal(DateTimeOffset.Parse("2026-03-19T00:02:00Z"), state.RecentSamples[1].CheckedUtc);
+        Assert.Equal("Timeout", state.RecentSamples[1].ResultKind);
     }
 
     private static PollingSchedulerService CreateScheduler(
         DashboardConfig config,
         IEndpointStateStore stateStore,
         IEndpointPoller endpointPoller,
-        IHealthResponseParser healthResponseParser)
+        IHealthResponseParser healthResponseParser,
+        RuntimeStateOptions? runtimeStateOptions = null)
     {
         return new PollingSchedulerService(
             config,
             stateStore,
             endpointPoller,
+            new NoOpEndpointNotificationService(),
             healthResponseParser,
+            runtimeStateOptions ?? new RuntimeStateOptions(),
             TimeProvider.System,
             NullLogger<PollingSchedulerService>.Instance);
     }
@@ -337,6 +417,14 @@ public sealed class PollingSchedulerServiceTests
         public HealthSnapshot Parse(EndpointConfig endpoint, string json, long durationMs)
         {
             return _parse(endpoint, json, durationMs);
+        }
+    }
+
+    private sealed class NoOpEndpointNotificationService : IEndpointNotificationService
+    {
+        public Task NotifyAsync(EndpointConfig endpoint, EndpointState? previousState, EndpointState currentState, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }

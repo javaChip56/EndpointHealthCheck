@@ -2,6 +2,7 @@ id: orders-api
 name: Orders API
 url: https://orders.example.com/health
 enabled: true
+priority: High
 frequencySeconds: 30
 timeoutSeconds: 10
 headers:

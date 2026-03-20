@@ -1,6 +1,7 @@
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Scheduling;
+using ApiHealthDashboard.Statistics;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -112,7 +113,8 @@ public class IndexModel : PageModel
                 statesById.TryGetValue(endpoint.Id, out var state);
                 return EndpointSummaryViewModel.From(endpoint, state);
             })
-            .OrderBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(static endpoint => endpoint.PrioritySortOrder)
+            .ThenBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         Counters = new DashboardCountersViewModel
@@ -130,7 +132,8 @@ public class IndexModel : PageModel
         ProblemEndpoints = Endpoints
             .Where(static endpoint => !string.IsNullOrWhiteSpace(endpoint.ErrorText) ||
                                       endpoint.Status is "Degraded" or "Unhealthy")
-            .OrderBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(static endpoint => endpoint.PrioritySortOrder)
+            .ThenBy(static endpoint => endpoint.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         _logger.LogDebug("Loaded dashboard with {EndpointCount} endpoint summaries.", Endpoints.Count);
@@ -169,6 +172,12 @@ public class IndexModel : PageModel
 
         public required bool Enabled { get; init; }
 
+        public required string Priority { get; init; }
+
+        public required string PriorityBadgeClass { get; init; }
+
+        public int PrioritySortOrder { get; init; }
+
         public bool IsPolling { get; init; }
 
         public bool ShowIdHint { get; init; }
@@ -178,6 +187,22 @@ public class IndexModel : PageModel
         public string LastSuccessfulText { get; init; } = "Never";
 
         public string DurationText { get; init; } = "-";
+
+        public string RecentSuccessRateText { get; init; } = "No recent samples";
+
+        public string RecentAverageDurationText { get; init; } = "-";
+
+        public string RecentFailureCountText { get; init; } = "0 failures";
+
+        public string RecentTrendText { get; init; } = "Awaiting trend";
+
+        public string RecentTrendBadgeClass { get; init; } = "badge-light";
+
+        public string RecentTrendSummary { get; init; } = "Need more samples to detect a trend.";
+
+        public string RecentLastChangeText { get; init; } = "No recent change";
+
+        public IReadOnlyList<RecentSampleIndicatorViewModel> RecentIndicators { get; init; } = [];
 
         public string? ErrorText { get; init; }
 
@@ -191,9 +216,16 @@ public class IndexModel : PageModel
 
         public bool ShowStatusDescription => !string.Equals(StatusDescription, Status, StringComparison.OrdinalIgnoreCase);
 
+        public bool HasRecentSamples => RecentIndicators.Count > 0;
+
         public static EndpointSummaryViewModel From(EndpointConfig endpoint, EndpointState? state)
         {
             var status = state?.Status ?? "Unknown";
+            var recentSamples = state?.RecentSamples
+                .Select(static sample => sample.Clone())
+                .ToArray() ?? [];
+            var recentMetrics = RecentPollSampleMetricsCalculator.Calculate(recentSamples);
+            var trendAnalysis = RecentPollTrendAnalyzer.Analyze(recentSamples);
 
             return new EndpointSummaryViewModel
             {
@@ -203,12 +235,48 @@ public class IndexModel : PageModel
                 StatusBadgeClass = ToBadgeClass(status),
                 FrequencyText = $"{endpoint.FrequencySeconds} sec",
                 Enabled = endpoint.Enabled,
+                Priority = EndpointPriority.Normalize(endpoint.Priority),
+                PriorityBadgeClass = ToPriorityBadgeClass(endpoint.Priority),
+                PrioritySortOrder = EndpointPriority.GetSortOrder(endpoint.Priority),
                 IsPolling = state?.IsPolling ?? false,
                 ShowIdHint = ShouldShowIdHint(endpoint.Name, endpoint.Id),
                 LastCheckedText = FormatDateTime(state?.LastCheckedUtc),
                 LastSuccessfulText = FormatDateTime(state?.LastSuccessfulUtc),
                 DurationText = state?.DurationMs is long durationMs ? $"{durationMs} ms" : "-",
+                RecentSuccessRateText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.SuccessRatePercent}% success"
+                    : "No recent samples",
+                RecentAverageDurationText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.AverageDurationMs} ms avg"
+                    : "-",
+                RecentFailureCountText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.FailureCount} failure{(recentMetrics.FailureCount == 1 ? string.Empty : "s")}"
+                    : "0 failures",
+                RecentTrendText = ToTrendText(trendAnalysis.TrendKind, status),
+                RecentTrendBadgeClass = ToTrendBadgeClass(trendAnalysis.TrendKind),
+                RecentTrendSummary = BuildTrendSummary(trendAnalysis, recentMetrics),
+                RecentLastChangeText = recentMetrics.LastStatusChangeUtc is DateTimeOffset lastStatusChangeUtc
+                    ? FormatDateTime(lastStatusChangeUtc)
+                    : "No recent change",
+                RecentIndicators = recentSamples
+                    .OrderByDescending(static sample => sample.CheckedUtc)
+                    .Take(8)
+                    .Select(CreateRecentIndicator)
+                    .ToArray(),
                 ErrorText = state?.LastError
+            };
+        }
+
+        private static RecentSampleIndicatorViewModel CreateRecentIndicator(RecentPollSample sample)
+        {
+            var summary = string.IsNullOrWhiteSpace(sample.ErrorSummary)
+                ? $"{sample.Status} via {sample.ResultKind}"
+                : $"{sample.Status} via {sample.ResultKind}: {sample.ErrorSummary}";
+
+            return new RecentSampleIndicatorViewModel
+            {
+                BadgeClass = ToRecentIndicatorClass(sample),
+                Summary = $"{sample.CheckedUtc.ToUniversalTime():yyyy-MM-dd HH:mm:ss 'UTC'} - {summary}"
             };
         }
 
@@ -258,5 +326,89 @@ public class IndexModel : PageModel
                 _ => "badge-secondary"
             };
         }
+
+        private static string ToPriorityBadgeClass(string priority)
+        {
+            return EndpointPriority.Normalize(priority) switch
+            {
+                EndpointPriority.Critical => "badge-danger",
+                EndpointPriority.High => "badge-warning",
+                EndpointPriority.Low => "badge-secondary",
+                _ => "badge-info"
+            };
+        }
+
+        private static string ToRecentIndicatorClass(RecentPollSample sample)
+        {
+            if (!string.IsNullOrWhiteSpace(sample.ErrorSummary) ||
+                !string.Equals(sample.ResultKind, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                return "sample-indicator-failure";
+            }
+
+            return sample.Status switch
+            {
+                "Healthy" => "sample-indicator-healthy",
+                "Degraded" => "sample-indicator-degraded",
+                "Unhealthy" => "sample-indicator-unhealthy",
+                _ => "sample-indicator-unknown"
+            };
+        }
+
+        private static string ToTrendText(RecentPollTrendKind trendKind, string currentStatus)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "Failing",
+                RecentPollTrendKind.Improving => "Improving",
+                RecentPollTrendKind.Worsening => "Worsening",
+                RecentPollTrendKind.Flapping => "Flapping",
+                RecentPollTrendKind.Stable => $"Stable {currentStatus}",
+                _ => "Awaiting trend"
+            };
+        }
+
+        private static string ToTrendBadgeClass(RecentPollTrendKind trendKind)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "badge-danger",
+                RecentPollTrendKind.Improving => "badge-success",
+                RecentPollTrendKind.Worsening => "badge-warning",
+                RecentPollTrendKind.Flapping => "badge-danger",
+                RecentPollTrendKind.Stable => "badge-info",
+                _ => "badge-light"
+            };
+        }
+
+        private static string BuildTrendSummary(RecentPollTrendAnalysis trendAnalysis, RecentPollSampleMetrics recentMetrics)
+        {
+            if (!recentMetrics.HasSamples)
+            {
+                return "No recent samples retained yet.";
+            }
+
+            return trendAnalysis.TrendKind switch
+            {
+                RecentPollTrendKind.Failing =>
+                    "Recent samples are consistently failing and need attention.",
+                RecentPollTrendKind.Improving =>
+                    $"Recent samples are recovering across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Worsening =>
+                    $"Recent samples are trending worse across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Flapping =>
+                    $"Recent samples have changed status {trendAnalysis.Transitions.Count} times and may be flapping.",
+                RecentPollTrendKind.Stable =>
+                    "Recent samples are holding a consistent status.",
+                _ => "Need at least two retained samples to detect a trend."
+            };
+        }
+    }
+
+    public sealed class RecentSampleIndicatorViewModel
+    {
+        public required string BadgeClass { get; init; }
+
+        public required string Summary { get; init; }
     }
 }

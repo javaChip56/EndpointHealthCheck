@@ -36,13 +36,47 @@ public sealed class DashboardSettings
 
     public bool ShowRawPayload { get; set; }
 
+    public DashboardNotificationSettings Notifications { get; set; } = new();
+
     public DashboardSettings Clone()
     {
         return new DashboardSettings
         {
             RefreshUiSeconds = RefreshUiSeconds,
             RequestTimeoutSecondsDefault = RequestTimeoutSecondsDefault,
-            ShowRawPayload = ShowRawPayload
+            ShowRawPayload = ShowRawPayload,
+            Notifications = Notifications.Clone()
+        };
+    }
+}
+
+public sealed class DashboardNotificationSettings
+{
+    public bool Enabled { get; set; }
+
+    public bool NotifyOnRecovery { get; set; } = true;
+
+    public int CooldownMinutes { get; set; } = 60;
+
+    public string MinimumPriority { get; set; } = EndpointPriority.Normal;
+
+    public string SubjectPrefix { get; set; } = "[ApiHealthDashboard]";
+
+    public List<string> To { get; set; } = new();
+
+    public List<string> Cc { get; set; } = new();
+
+    public DashboardNotificationSettings Clone()
+    {
+        return new DashboardNotificationSettings
+        {
+            Enabled = Enabled,
+            NotifyOnRecovery = NotifyOnRecovery,
+            CooldownMinutes = CooldownMinutes,
+            MinimumPriority = MinimumPriority,
+            SubjectPrefix = SubjectPrefix,
+            To = [.. To],
+            Cc = [.. Cc]
         };
     }
 }
@@ -61,11 +95,17 @@ public sealed class EndpointConfig
 
     public int? TimeoutSeconds { get; set; }
 
+    public string Priority { get; set; } = EndpointPriority.Normal;
+
     public Dictionary<string, string> Headers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public List<string> IncludeChecks { get; set; } = new();
 
     public List<string> ExcludeChecks { get; set; } = new();
+
+    public List<string> NotificationEmails { get; set; } = new();
+
+    public List<string> NotificationCc { get; set; } = new();
 
     public EndpointConfig Clone()
     {
@@ -77,9 +117,12 @@ public sealed class EndpointConfig
             Enabled = Enabled,
             FrequencySeconds = FrequencySeconds,
             TimeoutSeconds = TimeoutSeconds,
+            Priority = Priority,
             Headers = new Dictionary<string, string>(Headers, StringComparer.OrdinalIgnoreCase),
             IncludeChecks = [.. IncludeChecks],
-            ExcludeChecks = [.. ExcludeChecks]
+            ExcludeChecks = [.. ExcludeChecks],
+            NotificationEmails = [.. NotificationEmails],
+            NotificationCc = [.. NotificationCc]
         };
     }
 }

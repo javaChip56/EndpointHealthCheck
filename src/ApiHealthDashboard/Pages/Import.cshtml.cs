@@ -66,12 +66,16 @@ public sealed class ImportModel : PageModel
                     FrequencySeconds = Input.FrequencySeconds,
                     TimeoutSeconds = Input.TimeoutSeconds,
                     HeadersText = Input.HeadersText,
-                    IncludeDiscoveredChecks = Input.IncludeDiscoveredChecks
+                    IncludeDiscoveredChecks = Input.IncludeDiscoveredChecks,
+                    NotificationEmailsText = Input.NotificationEmailsText,
+                    NotificationCcText = Input.NotificationCcText
                 },
                 cancellationToken);
 
             Input.Id = Result.SuggestedEndpoint.Id;
             Input.Name = Result.SuggestedEndpoint.Name;
+            Input.NotificationEmailsText = string.Join(Environment.NewLine, Result.SuggestedEndpoint.NotificationEmails);
+            Input.NotificationCcText = string.Join(Environment.NewLine, Result.SuggestedEndpoint.NotificationCc);
             ModelState.Clear();
 
             _logger.LogInformation(
@@ -161,5 +165,11 @@ public sealed class ImportModel : PageModel
 
         [Display(Name = "Use discovered top-level checks as includeChecks")]
         public bool IncludeDiscoveredChecks { get; set; }
+
+        [Display(Name = "Notification emails")]
+        public string NotificationEmailsText { get; set; } = string.Empty;
+
+        [Display(Name = "Notification CC")]
+        public string NotificationCcText { get; set; } = string.Empty;
     }
 }

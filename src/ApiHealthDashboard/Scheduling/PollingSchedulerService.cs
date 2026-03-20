@@ -13,8 +13,10 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
 
     private readonly DashboardConfig _dashboardConfig;
     private readonly IEndpointPoller _endpointPoller;
+    private readonly IEndpointNotificationService _endpointNotificationService;
     private readonly IHealthResponseParser _healthResponseParser;
     private readonly ILogger<PollingSchedulerService> _logger;
+    private readonly RuntimeStateOptions _runtimeStateOptions;
     private readonly IEndpointStateStore _stateStore;
     private readonly TimeProvider _timeProvider;
     private readonly object _syncRoot = new();
@@ -27,14 +29,18 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
         DashboardConfig dashboardConfig,
         IEndpointStateStore stateStore,
         IEndpointPoller endpointPoller,
+        IEndpointNotificationService endpointNotificationService,
         IHealthResponseParser healthResponseParser,
+        RuntimeStateOptions runtimeStateOptions,
         TimeProvider timeProvider,
         ILogger<PollingSchedulerService> logger)
     {
         _dashboardConfig = dashboardConfig;
         _stateStore = stateStore;
         _endpointPoller = endpointPoller;
+        _endpointNotificationService = endpointNotificationService;
         _healthResponseParser = healthResponseParser;
+        _runtimeStateOptions = runtimeStateOptions;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -192,7 +198,8 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
 
     private async Task PollEndpointCoreAsync(EndpointConfig endpoint, string triggerSource, CancellationToken cancellationToken)
     {
-        var state = _stateStore.Get(endpoint.Id) ?? CreateFallbackState(endpoint);
+        var previousState = _stateStore.Get(endpoint.Id);
+        var state = previousState?.Clone() ?? CreateFallbackState(endpoint);
         state.EndpointName = endpoint.Name;
         state.IsPolling = true;
         _stateStore.Upsert(state);
@@ -238,6 +245,24 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             updatedState.LastError = result.ErrorMessage;
         }
 
+        AppendRecentSample(updatedState, result);
+
+        try
+        {
+            await _endpointNotificationService.NotifyAsync(
+                endpoint,
+                previousState,
+                updatedState,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to process email notifications for endpoint {EndpointId}.",
+                endpoint.Id);
+        }
+
         _stateStore.Upsert(updatedState);
 
         _logger.LogInformation(
@@ -258,6 +283,48 @@ public sealed class PollingSchedulerService : BackgroundService, IEndpointSchedu
             EndpointName = endpoint.Name,
             Status = "Unknown"
         };
+    }
+
+    private void AppendRecentSample(EndpointState state, PollResult result)
+    {
+        var recentSampleLimit = _runtimeStateOptions.GetRecentSampleLimit();
+        if (recentSampleLimit <= 0)
+        {
+            state.RecentSamples.Clear();
+            return;
+        }
+
+        state.RecentSamples.Add(new RecentPollSample
+        {
+            CheckedUtc = result.CheckedUtc,
+            Status = state.Status,
+            DurationMs = result.DurationMs,
+            ResultKind = result.Kind.ToString(),
+            ErrorSummary = SummarizeError(state.LastError)
+        });
+
+        if (state.RecentSamples.Count <= recentSampleLimit)
+        {
+            return;
+        }
+
+        var removeCount = state.RecentSamples.Count - recentSampleLimit;
+        state.RecentSamples.RemoveRange(0, removeCount);
+    }
+
+    private static string? SummarizeError(string? errorText)
+    {
+        if (string.IsNullOrWhiteSpace(errorText))
+        {
+            return null;
+        }
+
+        const int maxLength = 160;
+        var trimmed = errorText.Trim();
+
+        return trimmed.Length <= maxLength
+            ? trimmed
+            : $"{trimmed[..(maxLength - 3)]}...";
     }
 
     private static bool TryGetParserError(HealthSnapshot snapshot, out string parserError)

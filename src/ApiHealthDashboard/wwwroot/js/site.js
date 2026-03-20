@@ -1,6 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
   initializeDisabledActions(document);
   initializeEndpointSearch(document);
+  initializeEndpointRefreshForms(document);
+  applyPendingEndpointFlash(document);
   initializeCopyButtons(document);
   initializeDashboardSectionRefresh();
 });
@@ -105,6 +107,39 @@ function initializeCopyButtons(root) {
   });
 }
 
+function initializeEndpointRefreshForms(root) {
+  root.querySelectorAll("[data-endpoint-refresh-form]").forEach((form) => {
+    if (form.dataset.refreshFlashBound === "true") {
+      return;
+    }
+
+    form.dataset.refreshFlashBound = "true";
+    form.addEventListener("submit", () => {
+      const endpointInput = form.querySelector("input[name='endpointId']");
+      const endpointId = endpointInput ? endpointInput.value.trim() : "";
+
+      if (endpointId !== "") {
+        window.sessionStorage.setItem("dashboardPendingFlashEndpointId", endpointId);
+      }
+    });
+  });
+}
+
+function applyPendingEndpointFlash(root) {
+  const endpointId = window.sessionStorage.getItem("dashboardPendingFlashEndpointId");
+  if (!endpointId) {
+    return;
+  }
+
+  const row = root.querySelector(`[data-endpoint-row-id="${cssEscape(endpointId)}"]`);
+  if (!row) {
+    return;
+  }
+
+  flashEndpointRow(row);
+  window.sessionStorage.removeItem("dashboardPendingFlashEndpointId");
+}
+
 function setCopyFeedback(feedback, message) {
   if (feedback) {
     feedback.textContent = message;
@@ -130,6 +165,7 @@ function initializeDashboardSectionRefresh() {
     }
 
     const preservedQuery = getCurrentSearchQuery(container);
+    const previousRowStates = getEndpointRowStates(container);
 
     try {
       const response = await fetch(refreshUrl, {
@@ -150,6 +186,9 @@ function initializeDashboardSectionRefresh() {
 
       initializeDisabledActions(container);
       initializeEndpointSearch(container, preservedQuery);
+      initializeEndpointRefreshForms(container);
+      flashChangedEndpointRows(container, previousRowStates);
+      applyPendingEndpointFlash(container);
       initializeCopyButtons(container);
     } catch {
       // Keep the current rendered section if the background refresh fails.
@@ -169,4 +208,103 @@ function shouldPauseDashboardRefresh(container) {
   }
 
   return activeElement.matches("input, textarea, select");
+}
+
+function cssEscape(value) {
+  if (window.CSS && typeof window.CSS.escape === "function") {
+    return window.CSS.escape(value);
+  }
+
+  return value.replace(/["\\]/g, "\\$&");
+}
+
+function getEndpointRowStates(root) {
+  const rowStates = new Map();
+
+  root.querySelectorAll("[data-endpoint-row-id]").forEach((row) => {
+    const endpointId = row.getAttribute("data-endpoint-row-id");
+    if (!endpointId) {
+      return;
+    }
+
+    rowStates.set(endpointId, {
+      signature: row.getAttribute("data-endpoint-row-signature") || "",
+      status: row.getAttribute("data-endpoint-row-status") || ""
+    });
+  });
+
+  return rowStates;
+}
+
+function flashChangedEndpointRows(root, previousRowStates) {
+  if (!previousRowStates || previousRowStates.size === 0) {
+    return;
+  }
+
+  root.querySelectorAll("[data-endpoint-row-id]").forEach((row) => {
+    const endpointId = row.getAttribute("data-endpoint-row-id");
+    if (!endpointId || !previousRowStates.has(endpointId)) {
+      return;
+    }
+
+    const previousState = previousRowStates.get(endpointId);
+    const previousSignature = previousState ? previousState.signature : "";
+    const previousStatus = previousState ? previousState.status : "";
+    const currentSignature = row.getAttribute("data-endpoint-row-signature") || "";
+    const currentStatus = row.getAttribute("data-endpoint-row-status") || "";
+
+    if (previousSignature !== currentSignature) {
+      const flashClass = getFlashClassForStatusChange(previousStatus, currentStatus);
+
+      flashEndpointRow(row, flashClass);
+    }
+  });
+}
+
+function flashEndpointRow(row, flashClass = "dashboard-row-flash-update") {
+  row.classList.remove(
+    "dashboard-row-flash-update",
+    "dashboard-row-flash-improving",
+    "dashboard-row-flash-worsening"
+  );
+  void row.offsetWidth;
+  row.classList.add(flashClass);
+
+  window.setTimeout(() => {
+    row.classList.remove(flashClass);
+  }, 2200);
+}
+
+function getFlashClassForStatusChange(previousStatus, currentStatus) {
+  if (previousStatus === currentStatus) {
+    return "dashboard-row-flash-update";
+  }
+
+  const previousRank = getEndpointStatusRank(previousStatus);
+  const currentRank = getEndpointStatusRank(currentStatus);
+
+  if (currentRank > previousRank) {
+    return "dashboard-row-flash-improving";
+  }
+
+  if (currentRank < previousRank) {
+    return "dashboard-row-flash-worsening";
+  }
+
+  return "dashboard-row-flash-update";
+}
+
+function getEndpointStatusRank(status) {
+  switch ((status || "").toLowerCase()) {
+    case "healthy":
+      return 3;
+    case "degraded":
+      return 2;
+    case "unhealthy":
+      return 1;
+    case "unknown":
+      return 0;
+    default:
+      return 0;
+  }
 }

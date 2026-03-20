@@ -61,6 +61,7 @@ else
                                     <span class="hero-stat-label">Overall status</span>
                                     <div class="d-flex align-items-center flex-wrap">
                                         <span class="badge @endpoint.StatusBadgeClass mr-2">@endpoint.Status</span>
+                                        <span class="badge @endpoint.PriorityBadgeClass mr-2">@endpoint.Priority</span>
                                         @if (endpoint.IsPolling)
                                         {
                                             <small class="text-white-50">Polling now</small>
@@ -160,6 +161,10 @@ else
                                     <div class="metric-value">@endpoint.FrequencyText</div>
                                 </div>
                                 <div class="metric-item">
+                                    <span class="metric-label">Priority</span>
+                                    <div class="metric-value"><span class="badge @endpoint.PriorityBadgeClass">@endpoint.Priority</span></div>
+                                </div>
+                                <div class="metric-item">
                                     <span class="metric-label">Timeout</span>
                                     <div class="metric-value">@endpoint.TimeoutText</div>
                                 </div>
@@ -207,6 +212,51 @@ else
 
                     <div class="card">
                         <div class="card-header">
+                            <h3 class="card-title">Recent Poll Metrics</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasRecentSamples)
+                            {
+                                <div class="text-muted">No recent samples have been retained yet for this endpoint.</div>
+                            }
+                            else
+                            {
+                                <div class="recent-trend-card mb-3">
+                                    <div class="recent-trend-header">
+                                        <span class="badge @endpoint.RecentTrendBadgeClass">@endpoint.RecentTrendText</span>
+                                        <small class="text-muted">Last status change: @endpoint.LastStatusChangeText</small>
+                                    </div>
+                                    <p class="text-muted mb-0 mt-2">@endpoint.RecentTrendSummary</p>
+                                </div>
+
+                                <div class="metric-list">
+                                    <div class="metric-item">
+                                        <span class="metric-label">Retained samples</span>
+                                        <div class="metric-value">@endpoint.RecentSampleCount</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Recent success rate</span>
+                                        <div class="metric-value">@endpoint.RecentSuccessRateText</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Recent failures</span>
+                                        <div class="metric-value">@endpoint.RecentFailureCountText</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Average duration</span>
+                                        <div class="metric-value">@endpoint.RecentAverageDurationText</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Last status change</span>
+                                        <div class="metric-value">@endpoint.LastStatusChangeText</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
                             <h3 class="card-title">Request Filters</h3>
                         </div>
                         <div class="card-body">
@@ -245,6 +295,36 @@ else
                                             {
                                                 <span class="badge badge-light filter-chip">@checkName</span>
                                             }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Notification History</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasNotificationDispatches)
+                            {
+                                <div class="text-muted">Successful notification dispatches will appear here after emails are sent for this endpoint.</div>
+                            }
+                            else
+                            {
+                                <div class="notification-history-list">
+                                    @foreach (var dispatch in endpoint.NotificationDispatches)
+                                    {
+                                        <div class="notification-history-item">
+                                            <div class="recent-poll-heading">
+                                                <div class="recent-poll-badges">
+                                                    <span class="badge @dispatch.EventBadgeClass">@dispatch.EventType</span>
+                                                    <span class="badge badge-light">@dispatch.ConditionLabel</span>
+                                                </div>
+                                                <div class="recent-poll-time">@dispatch.SentText</div>
+                                            </div>
+                                            <div class="small text-muted mt-2">@dispatch.RecipientSummary</div>
                                         </div>
                                     }
                                 </div>
@@ -310,6 +390,88 @@ else
                                     @foreach (var node in endpoint.Nodes)
                                     {
                                         <partial name="_HealthNode" model="node" />
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Status History</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasRecentSamples)
+                            {
+                                <div class="text-muted">Recent status history will appear here after enough runtime samples have been collected.</div>
+                            }
+                            else
+                            {
+                                <div class="sample-indicator-strip mb-3" aria-label="Recent status trend">
+                                    @foreach (var sample in endpoint.RecentSamples)
+                                    {
+                                        <span class="sample-indicator @sample.IndicatorBadgeClass" title="@sample.CheckedText - @sample.Status via @sample.ResultKind"></span>
+                                    }
+                                </div>
+
+                                @if (!endpoint.HasStatusTransitions)
+                                {
+                                    <div class="text-muted">No status transition has been observed in the retained sample window.</div>
+                                }
+                                else
+                                {
+                                    <div class="status-history-list">
+                                        @foreach (var transition in endpoint.RecentStatusTransitions)
+                                        {
+                                            <div class="status-history-item">
+                                                <div class="status-history-badges">
+                                                    <span class="badge @transition.FromStatusBadgeClass">@transition.FromStatus</span>
+                                                    <i class="fas fa-arrow-right text-muted"></i>
+                                                    <span class="badge @transition.ToStatusBadgeClass">@transition.ToStatus</span>
+                                                </div>
+                                                <div class="status-history-time">@transition.ChangedText</div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Poll Activity</h3>
+                        </div>
+                        <div class="card-body">
+                            @if (!endpoint.HasRecentSamples)
+                            {
+                                <div class="text-muted">Recent poll activity will appear here after enough runtime samples have been collected.</div>
+                            }
+                            else
+                            {
+                                <div class="recent-poll-list">
+                                    @foreach (var sample in endpoint.RecentSamples)
+                                    {
+                                        <div class="recent-poll-item">
+                                            <div class="recent-poll-heading">
+                                                <div class="recent-poll-badges">
+                                                    <span class="badge @sample.StatusBadgeClass">@sample.Status</span>
+                                                    <span class="badge @sample.ResultKindBadgeClass">@sample.ResultKind</span>
+                                                </div>
+                                                <div class="recent-poll-time">@sample.CheckedText</div>
+                                            </div>
+                                            <div class="recent-poll-meta">
+                                                <span>@sample.DurationText</span>
+                                                @if (sample.HasError)
+                                                {
+                                                    <span class="text-danger">@sample.ErrorSummary</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No error</span>
+                                                }
+                                            </div>
+                                        </div>
                                     }
                                 </div>
                             }

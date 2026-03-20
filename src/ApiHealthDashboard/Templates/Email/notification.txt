@@ -1,0 +1,13 @@
+{{Subject}}
+
+Endpoint: {{EndpointName}} ({{EndpointId}})
+URL: {{EndpointUrl}}
+Priority: {{Priority}}
+Event: {{EventType}}
+Current status: {{CurrentStatus}}
+Current trend: {{CurrentTrend}}
+Previous condition: {{PreviousCondition}}
+Error: {{ErrorSummary}}
+Checked: {{CheckedUtc}}
+
+{{SummaryText}}

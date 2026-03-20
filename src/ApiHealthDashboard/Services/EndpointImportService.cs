@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.ComponentModel.DataAnnotations;
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Parsing;
@@ -11,6 +12,7 @@ public sealed class EndpointImportService : IEndpointImportService
 {
     private const int ResponsePreviewLimit = 12000;
     private static readonly string[] GenericPathSegments = ["health", "healthz", "status", "ready", "live"];
+    private static readonly EmailAddressAttribute EmailValidator = new();
 
     private readonly DashboardConfig _dashboardConfig;
     private readonly IHealthResponseParser _healthResponseParser;
@@ -46,6 +48,8 @@ public sealed class EndpointImportService : IEndpointImportService
         var suggestedName = string.IsNullOrWhiteSpace(request.Name)
             ? SuggestEndpointName(suggestedId)
             : request.Name.Trim();
+        var notificationEmails = ParseEmailList(request.NotificationEmailsText, "notification email");
+        var notificationCc = ParseEmailList(request.NotificationCcText, "notification CC");
 
         var probeEndpoint = new EndpointConfig
         {
@@ -67,6 +71,7 @@ public sealed class EndpointImportService : IEndpointImportService
         var snapshot = string.IsNullOrWhiteSpace(pollResult.ResponseBody)
             ? null
             : _healthResponseParser.Parse(probeEndpoint, pollResult.ResponseBody, pollResult.DurationMs);
+        var existingEndpoint = FindExistingEndpoint(probeEndpoint);
         var topLevelCheckNames = snapshot?.Nodes
             .Select(static node => node.Name)
             .Where(static name => !string.IsNullOrWhiteSpace(name))
@@ -82,15 +87,21 @@ public sealed class EndpointImportService : IEndpointImportService
             Enabled = probeEndpoint.Enabled,
             FrequencySeconds = probeEndpoint.FrequencySeconds,
             TimeoutSeconds = probeEndpoint.TimeoutSeconds,
+            Priority = EndpointPriority.Normalize(existingEndpoint?.Priority),
             Headers = new Dictionary<string, string>(probeEndpoint.Headers, StringComparer.OrdinalIgnoreCase),
             IncludeChecks = request.IncludeDiscoveredChecks ? [.. topLevelCheckNames] : [],
-            ExcludeChecks = []
+            ExcludeChecks = [],
+            NotificationEmails = notificationEmails.Count > 0
+                ? notificationEmails
+                : [.. existingEndpoint?.NotificationEmails ?? []],
+            NotificationCc = notificationCc.Count > 0
+                ? notificationCc
+                : [.. existingEndpoint?.NotificationCc ?? []]
         };
 
         var shouldGenerateYamlPreview = !(pollResult.Kind == PollResultKind.HttpError &&
                                           pollResult.StatusCode == System.Net.HttpStatusCode.NotFound);
         var generatedYaml = shouldGenerateYamlPreview ? RenderEndpointYaml(suggestedEndpoint) : null;
-        var existingEndpoint = FindExistingEndpoint(suggestedEndpoint);
         var existingYaml = existingEndpoint is null ? null : RenderEndpointYaml(existingEndpoint);
         var diffLines = existingYaml is null || string.IsNullOrWhiteSpace(generatedYaml)
             ? []
@@ -194,6 +205,31 @@ public sealed class EndpointImportService : IEndpointImportService
         }
 
         return headers;
+    }
+
+    private static List<string> ParseEmailList(string value, string fieldLabel)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        var emails = value
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split(['\n', ',', ';'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(static email => email.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        for (var index = 0; index < emails.Count; index++)
+        {
+            if (!EmailValidator.IsValid(emails[index]))
+            {
+                throw new EndpointImportException([$"The {fieldLabel} value '{emails[index]}' is not a valid email address."]);
+            }
+        }
+
+        return emails;
     }
 
     private EndpointConfig? FindExistingEndpoint(EndpointConfig suggestedEndpoint)
@@ -399,6 +435,7 @@ public sealed class EndpointImportService : IEndpointImportService
             $"name: {Quote(endpoint.Name)}",
             $"url: {Quote(endpoint.Url)}",
             $"enabled: {endpoint.Enabled.ToString().ToLowerInvariant()}",
+            $"priority: {Quote(EndpointPriority.Normalize(endpoint.Priority))}",
             $"frequencySeconds: {endpoint.FrequencySeconds}"
         };
 
@@ -434,6 +471,26 @@ public sealed class EndpointImportService : IEndpointImportService
             foreach (var check in endpoint.ExcludeChecks.OrderBy(static item => item, StringComparer.OrdinalIgnoreCase))
             {
                 lines.Add($"  - {Quote(check)}");
+            }
+        }
+
+        if (endpoint.NotificationEmails.Count > 0)
+        {
+            lines.Add("notificationEmails:");
+
+            foreach (var email in endpoint.NotificationEmails.OrderBy(static item => item, StringComparer.OrdinalIgnoreCase))
+            {
+                lines.Add($"  - {Quote(email)}");
+            }
+        }
+
+        if (endpoint.NotificationCc.Count > 0)
+        {
+            lines.Add("notificationCc:");
+
+            foreach (var email in endpoint.NotificationCc.OrderBy(static item => item, StringComparer.OrdinalIgnoreCase))
+            {
+                lines.Add($"  - {Quote(email)}");
             }
         }
 

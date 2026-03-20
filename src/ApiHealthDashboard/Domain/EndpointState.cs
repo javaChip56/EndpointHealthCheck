@@ -20,6 +20,10 @@ public sealed class EndpointState
 
     public bool IsPolling { get; set; }
 
+    public List<RecentPollSample> RecentSamples { get; set; } = new();
+
+    public List<EndpointNotificationDispatch> NotificationDispatches { get; set; } = new();
+
     public EndpointState Clone()
     {
         return new EndpointState
@@ -32,7 +36,9 @@ public sealed class EndpointState
             DurationMs = DurationMs,
             LastError = LastError,
             Snapshot = Snapshot?.Clone(),
-            IsPolling = IsPolling
+            IsPolling = IsPolling,
+            RecentSamples = RecentSamples.Select(static sample => sample.Clone()).ToList(),
+            NotificationDispatches = NotificationDispatches.Select(static dispatch => dispatch.Clone()).ToList()
         };
     }
 }

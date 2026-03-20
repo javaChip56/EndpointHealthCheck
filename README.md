@@ -7,7 +7,7 @@ This project is being built to:
 - parse JSON health responses without Xabaril UI libraries
 - render a local-only AdminLTE dashboard
 - load endpoint definitions from YAML
-- keep runtime state in memory
+- keep active runtime state in memory with optional per-endpoint file persistence for current state
 - stay portable for internal and restricted environments
 
 ## Current Status
@@ -30,6 +30,12 @@ Implemented so far:
 - Post-v1: endpoint import flow with live probe, YAML preview, and diff comparison
 - Post-v1: CLI execution mode with JSON/XML reporting
 - Post-v1: YAML hot-reload for dashboard and endpoint files
+- Post-v1: per-endpoint current-state persistence with compact JSON files
+- Post-v1: runtime-state cleanup and retention settings for orphaned persisted state files
+- Post-v1: recent poll sample retention with derived dashboard and details metrics
+- Post-v1: mini trend visuals and short status history from retained runtime samples
+- Post-v1: SMTP email notifications with dashboard defaults and per-endpoint recipients
+- Post-v1: persisted notification dispatch history in runtime state
 
 Not implemented yet:
 - Backlog items tracked for post-v1 work
@@ -84,8 +90,11 @@ Current configuration support:
 - `dashboard.requestTimeoutSecondsDefault`
 - `dashboard.showRawPayload`
 - `dashboard.endpointFiles` for loading endpoints from one or more separate YAML files
+- `dashboard.notifications.enabled`, `notifyOnRecovery`, `cooldownMinutes`, `minimumPriority`, `subjectPrefix`, `to`, and `cc`
 - endpoint `id`, `name`, `url`, `enabled`, `frequencySeconds`, `timeoutSeconds`
+- endpoint `priority` with `Critical`, `High`, `Normal`, or `Low`
 - endpoint `headers`, `includeChecks`, `excludeChecks`
+- endpoint `notificationEmails` and `notificationCc`
 - `${ENV_VAR}` substitution in YAML values
 - endpoint definitions can be kept inline in `dashboard.yaml` or split into multiple files under [`src/ApiHealthDashboard/endpoints`](src/ApiHealthDashboard/endpoints)
 - project YAML files are copied to both build and publish output by default
@@ -100,20 +109,29 @@ Validation currently checks:
 
 ### Runtime State Store
 
-The app now includes an in-memory endpoint state store for current runtime status.
+The app now includes a runtime endpoint state store with an in-memory cache and optional per-endpoint current-state persistence.
 
 Current runtime models:
 - [`src/ApiHealthDashboard/Domain/EndpointState.cs`](src/ApiHealthDashboard/Domain/EndpointState.cs)
+- [`src/ApiHealthDashboard/Domain/RecentPollSample.cs`](src/ApiHealthDashboard/Domain/RecentPollSample.cs)
 - [`src/ApiHealthDashboard/Domain/HealthSnapshot.cs`](src/ApiHealthDashboard/Domain/HealthSnapshot.cs)
 - [`src/ApiHealthDashboard/Domain/HealthNode.cs`](src/ApiHealthDashboard/Domain/HealthNode.cs)
 
 State store components:
 - [`src/ApiHealthDashboard/State/IEndpointStateStore.cs`](src/ApiHealthDashboard/State/IEndpointStateStore.cs)
 - [`src/ApiHealthDashboard/State/InMemoryEndpointStateStore.cs`](src/ApiHealthDashboard/State/InMemoryEndpointStateStore.cs)
+- [`src/ApiHealthDashboard/State/FileBackedEndpointStateStore.cs`](src/ApiHealthDashboard/State/FileBackedEndpointStateStore.cs)
+- [`src/ApiHealthDashboard/Configuration/RuntimeStateOptions.cs`](src/ApiHealthDashboard/Configuration/RuntimeStateOptions.cs)
 
 Current behavior:
 - initializes one runtime state entry per configured endpoint at startup
-- stores endpoint state in memory only
+- keeps active runtime state in memory for fast reads by pages and the scheduler
+- can persist the latest current state for each endpoint to a compact JSON file under a configurable runtime-state directory
+- restores persisted current state on startup for configured endpoints and resets any stale `IsPolling` flag to `false`
+- persists successful email notification dispatch history alongside endpoint runtime state so cooldown survives restarts
+- can clean up orphaned persisted state files on a configurable interval after a configurable retention window
+- retains a configurable rolling window of recent poll samples per endpoint for derived runtime metrics
+- retains a configurable rolling window of recent notification dispatch records per endpoint
 - supports get-all, get-one, upsert, and reinitialize operations
 - returns deep copies so callers cannot mutate internal store state accidentally
 - uses thread-safe locking for concurrent access
@@ -166,6 +184,7 @@ Current behavior:
 - prevents overlapping polls for the same endpoint with endpoint-level locking
 - updates runtime state before and after each poll
 - records last checked time, last successful time, duration, status, and current error
+- triggers email notifications when an endpoint enters a problem state, changes alert state, or recovers
 - keeps slow endpoints from blocking other endpoint loops
 - already exposes a scheduler interface that Phase 8 can reuse for manual refresh actions
 - restarts enabled polling loops automatically when YAML hot-reload changes the configured endpoint set
@@ -202,7 +221,11 @@ Current dashboard behavior:
 - highlights healthy, degraded, unhealthy, and unknown totals in summary cards
 - includes a client-side search field for filtering endpoint rows by name, id, status, or error text
 - refreshes the live dashboard section with same-origin timed GET requests instead of reloading the whole page
-- renders a live endpoint table with last check, duration, error summary, and manual refresh actions
+- briefly flashes endpoint rows when they are manually refreshed or when background polling updates change the rendered row state
+- uses different row flash cues for routine updates, improving health transitions, and worsening health transitions
+- shows a compact recent-status indicator strip plus a short trend label for each endpoint
+- sorts endpoint summaries and active issues by endpoint priority before name
+- renders a live endpoint table with last check, duration, recent signal metrics, error summary, and manual refresh actions
 - surfaces degraded and unhealthy endpoints in an active issues panel for faster triage
 - shows a clearer empty state when no endpoints are configured
 
@@ -214,10 +237,28 @@ Current import behavior:
 - sends a live request using the entered URL, headers, timeout, and enabled/frequency settings
 - auto-suggests endpoint id and name when those fields are left blank
 - shows a soft warning when the chosen poll frequency is below the configured appsettings recommendation
+- emits generated YAML with a normalized endpoint priority value
+- allows notification recipients and per-endpoint CC recipients to be entered and included in generated YAML
 - parses discovered checks from the response and can optionally populate `includeChecks`
 - generates a normalized YAML snippet for manual copy into `dashboard.yaml` or a separate endpoint file
 - compares the generated YAML against the currently loaded config when an existing endpoint matches by id or URL
 - shows a diff preview plus a raw response preview for review before any manual save
+
+### Email Notifications
+
+The app now supports SMTP email notifications with dashboard-level defaults and per-endpoint recipient overrides.
+
+Current email notification behavior:
+- uses SMTP settings from appsettings under `Email:Smtp`
+- uses file-based email templates from `Email:Templates` with defaults under [`src/ApiHealthDashboard/Templates/Email`](src/ApiHealthDashboard/Templates/Email)
+- uses dashboard YAML settings to enable notifications, set recovery behavior, cooldown, minimum priority, subject prefix, and default recipients
+- merges global dashboard recipients with endpoint-specific `notificationEmails` and `notificationCc`
+- sends alert emails when an endpoint enters or changes problem state
+- can send recovery emails when an endpoint returns to a non-problem state
+- can send a one-time `Stabilized` email when an endpoint settles into a `Stable ...` trend after recovering
+- sends multipart email with HTML content plus a plain-text fallback body
+- treats repeated transport failures as a `Failing` condition for alerting purposes
+- records successful dispatches in endpoint runtime state so notification cooldown and history survive restarts
 
 ### CLI Execution
 
@@ -228,6 +269,7 @@ Current CLI behavior:
 - executes one or more specific endpoint YAML files with repeated `--endpoint-file` arguments
 - reuses dashboard settings from `dashboard.yaml`, including default request timeout values
 - writes a machine-readable JSON report to standard output
+- includes endpoint priority in JSON and XML execution reports
 - can optionally write the same execution report to a JSON or XML file
 - keeps missing dashboard or endpoint YAML files as warnings in the output instead of failing hard
 
@@ -236,9 +278,12 @@ Current CLI behavior:
 The endpoint details page now acts as a diagnostic view for a single configured endpoint.
 
 Current details-page behavior:
-- shows endpoint metadata including enabled state, frequency, timeout, and masked request headers
+- shows endpoint metadata including enabled state, priority, frequency, timeout, and masked request headers
 - shows request filter configuration for included and excluded checks
 - summarizes the latest poll with status, timings, retrieved timestamp, and current error
+- shows retained recent sample metrics including success rate, failure count, average duration, last status change, and a short trend summary
+- shows a short recent status history with the latest observed status transitions
+- shows recent successful notification dispatch history with event type, condition, timestamp, and recipients
 - renders top-level and nested health checks recursively with native expand and collapse support
 - surfaces snapshot metadata captured from the parsed response
 - shows the raw payload section only when enabled in configuration
@@ -309,6 +354,20 @@ The app reads the dashboard YAML path from the `Bootstrap:DashboardConfigPath` s
 - [`src/ApiHealthDashboard/appsettings.Development.json`](src/ApiHealthDashboard/appsettings.Development.json)
 
 The current primary setting is `Bootstrap:DashboardConfigPath`. `Bootstrap:EndpointsConfigPath` is still accepted as a legacy fallback.
+
+Runtime state persistence is configured through `RuntimeState:Enabled` and `RuntimeState:DirectoryPath` in the same appsettings files. By default, the app writes compact per-endpoint current-state files under `runtime-state/endpoints` relative to the app content root.
+
+SMTP email delivery is configured through `Email:Smtp` in the same appsettings files. Keep secrets such as SMTP usernames and passwords in environment variables or deployment-time configuration rather than committing them to source control.
+
+Email template rendering is configured through `Email:Templates` in the same appsettings files. By default, the app loads [`notification.txt`](src/ApiHealthDashboard/Templates/Email/notification.txt) and [`notification.html`](src/ApiHealthDashboard/Templates/Email/notification.html) from `Templates/Email` under the app content root.
+
+Current cleanup settings:
+- `RuntimeState:CleanupEnabled` to enable periodic runtime-state cleanup
+- `RuntimeState:CleanupIntervalMinutes` to control how often orphan cleanup runs
+- `RuntimeState:DeleteOrphanedStateFiles` to enable deletion of persisted state files that no longer belong to configured endpoints
+- `RuntimeState:OrphanedStateFileRetentionHours` to keep orphaned state files for a configurable grace period before deletion
+- `RuntimeState:RecentSampleLimit` to cap how many recent poll samples are retained per endpoint
+- `RuntimeState:NotificationHistoryLimit` to cap how many notification dispatch records are retained per endpoint
 
 You can also override it with an environment variable:
 
@@ -455,7 +514,7 @@ Test file:
 - Do not use Xabaril health check UI packages
 - Do not rely on CDN-hosted frontend assets
 - Do not require a database
-- Keep runtime state in memory only
+- Keep active runtime state in memory and persisted runtime files lightweight
 - Prefer small, focused services
 
 ## Development Progress
@@ -478,8 +537,9 @@ Test file:
 ## Future Plans
 
 These are planned enhancements after the current v1 path:
-- allow per-endpoint priority so important endpoints can be surfaced and scheduled differently
-- optionally allow email sending, either through direct SMTP configuration or by calling an external API
+- add configurable retention controls for future persisted history files once trend capture is introduced
+- optionally add per-endpoint history files once the embedded recent-sample window is no longer sufficient
+- optionally add external email API delivery in addition to the current SMTP implementation
 
 ## Notes For Ongoing Updates
 

@@ -2,6 +2,7 @@ using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Formatting;
 using ApiHealthDashboard.Scheduling;
+using ApiHealthDashboard.Statistics;
 using ApiHealthDashboard.State;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -118,6 +119,10 @@ public class DetailsModel : PageModel
 
         public required string EnabledText { get; init; }
 
+        public required string Priority { get; init; }
+
+        public required string PriorityBadgeClass { get; init; }
+
         public required string FrequencyText { get; init; }
 
         public required string TimeoutText { get; init; }
@@ -137,6 +142,22 @@ public class DetailsModel : PageModel
         public string LastRetrievedText { get; init; } = "Never";
 
         public string DurationText { get; init; } = "-";
+
+        public int RecentSampleCount { get; init; }
+
+        public string RecentSuccessRateText { get; init; } = "No recent samples";
+
+        public string RecentFailureCountText { get; init; } = "0 failures";
+
+        public string RecentAverageDurationText { get; init; } = "-";
+
+        public string LastStatusChangeText { get; init; } = "No recent change";
+
+        public string RecentTrendText { get; init; } = "Awaiting trend";
+
+        public string RecentTrendBadgeClass { get; init; } = "badge-light";
+
+        public string RecentTrendSummary { get; init; } = "Need more samples to detect a trend.";
 
         public string? ErrorText { get; init; }
 
@@ -176,6 +197,18 @@ public class DetailsModel : PageModel
 
         public bool HasSnapshotMetadata => SnapshotMetadata.Count > 0;
 
+        public bool HasRecentSamples => RecentSamples.Count > 0;
+
+        public IReadOnlyList<RecentPollSampleViewModel> RecentSamples { get; init; } = [];
+
+        public IReadOnlyList<StatusTransitionViewModel> RecentStatusTransitions { get; init; } = [];
+
+        public bool HasStatusTransitions => RecentStatusTransitions.Count > 0;
+
+        public IReadOnlyList<NotificationDispatchViewModel> NotificationDispatches { get; init; } = [];
+
+        public bool HasNotificationDispatches => NotificationDispatches.Count > 0;
+
         public static EndpointDetailsViewModel From(
             EndpointConfig endpoint,
             EndpointState? state,
@@ -186,6 +219,11 @@ public class DetailsModel : PageModel
             var nodes = state?.Snapshot?.Nodes.Select(static node => node.Clone()).ToArray() ?? [];
             var flattenedNodes = FlattenNodes(nodes).ToArray();
             var snapshotDurationMs = state?.DurationMs ?? state?.Snapshot?.DurationMs;
+            var recentSamples = state?.RecentSamples
+                .Select(static sample => sample.Clone())
+                .ToArray() ?? [];
+            var recentMetrics = RecentPollSampleMetricsCalculator.Calculate(recentSamples);
+            var trendAnalysis = RecentPollTrendAnalyzer.Analyze(recentSamples);
 
             return new EndpointDetailsViewModel
             {
@@ -194,6 +232,8 @@ public class DetailsModel : PageModel
                 Url = endpoint.Url,
                 Enabled = endpoint.Enabled,
                 EnabledText = endpoint.Enabled ? "Enabled" : "Disabled",
+                Priority = EndpointPriority.Normalize(endpoint.Priority),
+                PriorityBadgeClass = ToPriorityBadgeClass(endpoint.Priority),
                 FrequencyText = $"{endpoint.FrequencySeconds} seconds",
                 TimeoutText = endpoint.TimeoutSeconds is null ? "Default timeout" : $"{timeoutSeconds} seconds",
                 Status = status,
@@ -204,6 +244,22 @@ public class DetailsModel : PageModel
                 LastSuccessfulText = FormatDateTime(state?.LastSuccessfulUtc),
                 LastRetrievedText = FormatDateTime(state?.Snapshot?.RetrievedUtc),
                 DurationText = snapshotDurationMs is long durationMs ? $"{durationMs} ms" : "-",
+                RecentSampleCount = recentMetrics.SampleCount,
+                RecentSuccessRateText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.SuccessRatePercent}% success"
+                    : "No recent samples",
+                RecentFailureCountText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.FailureCount} failure{(recentMetrics.FailureCount == 1 ? string.Empty : "s")}"
+                    : "0 failures",
+                RecentAverageDurationText = recentMetrics.HasSamples
+                    ? $"{recentMetrics.AverageDurationMs} ms"
+                    : "-",
+                LastStatusChangeText = recentMetrics.LastStatusChangeUtc is DateTimeOffset lastStatusChangeUtc
+                    ? FormatDateTime(lastStatusChangeUtc)
+                    : "No recent change",
+                RecentTrendText = ToTrendText(trendAnalysis.TrendKind, status),
+                RecentTrendBadgeClass = ToTrendBadgeClass(trendAnalysis.TrendKind),
+                RecentTrendSummary = BuildTrendSummary(trendAnalysis, recentMetrics),
                 ErrorText = state?.LastError,
                 Headers = endpoint.Headers
                     .OrderBy(static header => header.Key, StringComparer.OrdinalIgnoreCase)
@@ -236,7 +292,22 @@ public class DetailsModel : PageModel
                 UnhealthyCheckCount = flattenedNodes.Count(static node => node.Status == "Unhealthy"),
                 UnknownCheckCount = flattenedNodes.Count(static node => node.Status is not ("Healthy" or "Degraded" or "Unhealthy")),
                 RawPayload = showRawPayload ? FormatPayloadPreview(state?.Snapshot?.RawPayload) : null,
-                ShowRawPayload = showRawPayload
+                ShowRawPayload = showRawPayload,
+                RecentStatusTransitions = trendAnalysis.Transitions
+                    .OrderByDescending(static transition => transition.ChangedUtc)
+                    .Take(6)
+                    .Select(CreateStatusTransitionViewModel)
+                    .ToArray(),
+                NotificationDispatches = state?.NotificationDispatches
+                    .OrderByDescending(static dispatch => dispatch.SentUtc)
+                    .Take(8)
+                    .Select(CreateNotificationDispatchViewModel)
+                    .ToArray() ?? [],
+                RecentSamples = recentSamples
+                    .OrderByDescending(static sample => sample.CheckedUtc)
+                    .Take(10)
+                    .Select(CreateRecentSampleViewModel)
+                    .ToArray()
             };
         }
 
@@ -322,6 +393,154 @@ public class DetailsModel : PageModel
                 _ => "badge-secondary"
             };
         }
+
+        private static string ToPriorityBadgeClass(string priority)
+        {
+            return EndpointPriority.Normalize(priority) switch
+            {
+                EndpointPriority.Critical => "badge-danger",
+                EndpointPriority.High => "badge-warning",
+                EndpointPriority.Low => "badge-secondary",
+                _ => "badge-info"
+            };
+        }
+
+        private static RecentPollSampleViewModel CreateRecentSampleViewModel(RecentPollSample sample)
+        {
+            return new RecentPollSampleViewModel
+            {
+                CheckedText = FormatDateTime(sample.CheckedUtc),
+                Status = sample.Status,
+                StatusBadgeClass = ToBadgeClass(sample.Status),
+                IndicatorBadgeClass = ToRecentIndicatorClass(sample),
+                ResultKind = sample.ResultKind,
+                ResultKindBadgeClass = ToResultKindBadgeClass(sample),
+                DurationText = $"{sample.DurationMs} ms",
+                ErrorSummary = string.IsNullOrWhiteSpace(sample.ErrorSummary) ? "None" : sample.ErrorSummary,
+                HasError = !string.IsNullOrWhiteSpace(sample.ErrorSummary)
+            };
+        }
+
+        private static string ToResultKindBadgeClass(RecentPollSample sample)
+        {
+            if (!string.IsNullOrWhiteSpace(sample.ErrorSummary))
+            {
+                return "badge-danger";
+            }
+
+            return sample.ResultKind switch
+            {
+                "Success" => "badge-success",
+                "Timeout" => "badge-warning",
+                "NetworkError" => "badge-danger",
+                "HttpError" => "badge-danger",
+                "EmptyResponse" => "badge-warning",
+                _ => "badge-secondary"
+            };
+        }
+
+        private static string ToRecentIndicatorClass(RecentPollSample sample)
+        {
+            if (!string.IsNullOrWhiteSpace(sample.ErrorSummary) ||
+                !string.Equals(sample.ResultKind, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                return "sample-indicator-failure";
+            }
+
+            return sample.Status switch
+            {
+                "Healthy" => "sample-indicator-healthy",
+                "Degraded" => "sample-indicator-degraded",
+                "Unhealthy" => "sample-indicator-unhealthy",
+                _ => "sample-indicator-unknown"
+            };
+        }
+
+        private static StatusTransitionViewModel CreateStatusTransitionViewModel(RecentPollStatusTransition transition)
+        {
+            return new StatusTransitionViewModel
+            {
+                FromStatus = transition.FromStatus,
+                FromStatusBadgeClass = ToBadgeClass(transition.FromStatus),
+                ToStatus = transition.ToStatus,
+                ToStatusBadgeClass = ToBadgeClass(transition.ToStatus),
+                ChangedText = FormatDateTime(transition.ChangedUtc)
+            };
+        }
+
+        private static NotificationDispatchViewModel CreateNotificationDispatchViewModel(EndpointNotificationDispatch dispatch)
+        {
+            return new NotificationDispatchViewModel
+            {
+                EventType = dispatch.EventType,
+                EventBadgeClass = string.Equals(dispatch.EventType, "Recovery", StringComparison.OrdinalIgnoreCase)
+                    ? "badge-success"
+                    : "badge-warning",
+                ConditionLabel = dispatch.ConditionLabel,
+                SentText = FormatDateTime(dispatch.SentUtc),
+                RecipientSummary = BuildRecipientSummary(dispatch.To, dispatch.Cc)
+            };
+        }
+
+        private static string BuildRecipientSummary(IReadOnlyList<string> to, IReadOnlyList<string> cc)
+        {
+            var toSummary = to.Count == 0 ? "No direct recipients" : $"To: {string.Join(", ", to)}";
+            if (cc.Count == 0)
+            {
+                return toSummary;
+            }
+
+            return $"{toSummary} | CC: {string.Join(", ", cc)}";
+        }
+
+        private static string ToTrendText(RecentPollTrendKind trendKind, string currentStatus)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "Failing",
+                RecentPollTrendKind.Improving => "Improving",
+                RecentPollTrendKind.Worsening => "Worsening",
+                RecentPollTrendKind.Flapping => "Flapping",
+                RecentPollTrendKind.Stable => $"Stable {currentStatus}",
+                _ => "Awaiting trend"
+            };
+        }
+
+        private static string ToTrendBadgeClass(RecentPollTrendKind trendKind)
+        {
+            return trendKind switch
+            {
+                RecentPollTrendKind.Failing => "badge-danger",
+                RecentPollTrendKind.Improving => "badge-success",
+                RecentPollTrendKind.Worsening => "badge-warning",
+                RecentPollTrendKind.Flapping => "badge-danger",
+                RecentPollTrendKind.Stable => "badge-info",
+                _ => "badge-light"
+            };
+        }
+
+        private static string BuildTrendSummary(RecentPollTrendAnalysis trendAnalysis, RecentPollSampleMetrics recentMetrics)
+        {
+            if (!recentMetrics.HasSamples)
+            {
+                return "No recent samples retained yet.";
+            }
+
+            return trendAnalysis.TrendKind switch
+            {
+                RecentPollTrendKind.Failing =>
+                    "Recent checks are consistently failing and need attention.",
+                RecentPollTrendKind.Improving =>
+                    $"Recent checks are recovering across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Worsening =>
+                    $"Recent checks are trending worse across {trendAnalysis.Transitions.Count} status change{(trendAnalysis.Transitions.Count == 1 ? string.Empty : "s")}.",
+                RecentPollTrendKind.Flapping =>
+                    $"Recent checks have changed status {trendAnalysis.Transitions.Count} times and may be unstable.",
+                RecentPollTrendKind.Stable =>
+                    "Recent checks are holding a consistent status.",
+                _ => "Need at least two retained samples to detect a trend."
+            };
+        }
     }
 
     public sealed class HeaderSummaryViewModel
@@ -336,5 +555,52 @@ public class DetailsModel : PageModel
         public required string Name { get; init; }
 
         public required string Value { get; init; }
+    }
+
+    public sealed class RecentPollSampleViewModel
+    {
+        public required string CheckedText { get; init; }
+
+        public required string Status { get; init; }
+
+        public required string StatusBadgeClass { get; init; }
+
+        public required string IndicatorBadgeClass { get; init; }
+
+        public required string ResultKind { get; init; }
+
+        public required string ResultKindBadgeClass { get; init; }
+
+        public required string DurationText { get; init; }
+
+        public required string ErrorSummary { get; init; }
+
+        public bool HasError { get; init; }
+    }
+
+    public sealed class StatusTransitionViewModel
+    {
+        public required string FromStatus { get; init; }
+
+        public required string FromStatusBadgeClass { get; init; }
+
+        public required string ToStatus { get; init; }
+
+        public required string ToStatusBadgeClass { get; init; }
+
+        public required string ChangedText { get; init; }
+    }
+
+    public sealed class NotificationDispatchViewModel
+    {
+        public required string EventType { get; init; }
+
+        public required string EventBadgeClass { get; init; }
+
+        public required string ConditionLabel { get; init; }
+
+        public required string SentText { get; init; }
+
+        public required string RecipientSummary { get; init; }
     }
 }
