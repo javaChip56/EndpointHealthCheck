@@ -187,11 +187,12 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         {
             if (!hasExistingDispatchRecord ||
                 !previousCondition.IsProblem ||
-                !string.Equals(previousCondition.Label, currentCondition.Label, StringComparison.OrdinalIgnoreCase))
+                !string.Equals(previousCondition.Label, currentCondition.Label, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(previousCondition.TrendLabel, currentCondition.TrendLabel, StringComparison.OrdinalIgnoreCase))
             {
                 return new NotificationDecision(
                     "Alert",
-                    currentCondition.Label,
+                    currentCondition.SubjectLabel,
                     $"alert:{currentCondition.Label}:{currentCondition.Status}:{currentCondition.TrendLabel}");
             }
         }
@@ -199,11 +200,34 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         {
             return new NotificationDecision(
                 "Recovery",
-                currentCondition.Label,
+                currentCondition.SubjectLabel,
                 $"recovery:{previousCondition.Label}:{currentCondition.Status}");
+        }
+        else if (settings.NotifyOnRecovery &&
+                 hasExistingDispatchRecord &&
+                 IsStableTransition(previousCondition, currentCondition))
+        {
+            return new NotificationDecision(
+                "Stabilized",
+                currentCondition.TrendLabel,
+                $"stabilized:{currentCondition.Status}:{currentCondition.TrendLabel}");
         }
 
         return null;
+    }
+
+    private static bool IsStableTransition(NotificationCondition previousCondition, NotificationCondition currentCondition)
+    {
+        return !previousCondition.IsProblem &&
+               !currentCondition.IsProblem &&
+               !IsStableTrend(previousCondition.TrendLabel) &&
+               IsStableTrend(currentCondition.TrendLabel);
+    }
+
+    private static bool IsStableTrend(string? trendLabel)
+    {
+        return !string.IsNullOrWhiteSpace(trendLabel) &&
+               trendLabel.StartsWith("Stable ", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsWithinCooldown(EndpointState currentState, string signature, int cooldownMinutes)
@@ -287,9 +311,12 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         }
 
         builder.AppendLine();
-        builder.AppendLine(notification.EventType == "Recovery"
-            ? "The endpoint has recovered from its previous problem state."
-            : "The endpoint entered or changed problem state and may need attention.");
+        builder.AppendLine(notification.EventType switch
+        {
+            "Recovery" => "The endpoint has recovered from its previous problem state.",
+            "Stabilized" => "The endpoint has settled into a stable state after recovering from an earlier issue.",
+            _ => "The endpoint entered or changed problem state and may need attention."
+        });
 
         return builder.ToString().TrimEnd();
     }
@@ -306,6 +333,11 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         string? ErrorSummary,
         DateTimeOffset? CheckedUtc)
     {
+        public string SubjectLabel => string.Equals(Label, TrendLabel, StringComparison.OrdinalIgnoreCase) ||
+                                      string.Equals(Status, TrendLabel, StringComparison.OrdinalIgnoreCase)
+            ? Label
+            : $"{Label} ({TrendLabel})";
+
         public static NotificationCondition Empty { get; } = new(false, string.Empty, "Unknown", "Awaiting trend", null, null);
     }
 }

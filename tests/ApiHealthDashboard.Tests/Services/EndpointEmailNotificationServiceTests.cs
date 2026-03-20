@@ -193,6 +193,206 @@ public sealed class EndpointEmailNotificationServiceTests
         Assert.Single(currentState.NotificationDispatches);
     }
 
+    [Fact]
+    public async Task NotifyAsync_WhenProblemTrendChangesFromImprovingToWorsening_SendsNewAlert()
+    {
+        var config = CreateConfig();
+        var sender = new FakeEmailSender();
+        var service = CreateService(config, sender);
+
+        var previousState = new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Degraded",
+            LastCheckedUtc = DateTimeOffset.Parse("2026-03-19T02:00:00Z"),
+            LastError = "Latency exceeded threshold",
+            NotificationDispatches =
+            [
+                new EndpointNotificationDispatch
+                {
+                    EventType = "Alert",
+                    ConditionLabel = "Degraded (Improving)",
+                    Signature = "alert:Degraded:Degraded:Improving",
+                    SentUtc = DateTimeOffset.Parse("2026-03-19T01:30:00Z"),
+                    To = ["ops@example.com"]
+                }
+            ],
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T01:58:00Z"),
+                    Status = "Unhealthy",
+                    DurationMs = 140,
+                    ResultKind = "Success",
+                    ErrorSummary = "Latency exceeded threshold"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T01:59:00Z"),
+                    Status = "Degraded",
+                    DurationMs = 120,
+                    ResultKind = "Success",
+                    ErrorSummary = "Latency exceeded threshold"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:00:00Z"),
+                    Status = "Degraded",
+                    DurationMs = 115,
+                    ResultKind = "Success",
+                    ErrorSummary = "Latency exceeded threshold"
+                }
+            ]
+        };
+
+        var currentState = new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Degraded",
+            LastCheckedUtc = DateTimeOffset.Parse("2026-03-19T02:05:00Z"),
+            LastError = "Latency exceeded threshold",
+            NotificationDispatches = previousState.NotificationDispatches.Select(static dispatch => dispatch.Clone()).ToList(),
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:03:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 90,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:04:00Z"),
+                    Status = "Degraded",
+                    DurationMs = 125,
+                    ResultKind = "Success",
+                    ErrorSummary = "Latency exceeded threshold"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:05:00Z"),
+                    Status = "Degraded",
+                    DurationMs = 140,
+                    ResultKind = "Success",
+                    ErrorSummary = "Latency exceeded threshold"
+                }
+            ]
+        };
+
+        await service.NotifyAsync(config.Endpoints[0], previousState, currentState);
+
+        var message = Assert.Single(sender.Messages);
+        Assert.Contains("Alert", message.Subject, StringComparison.Ordinal);
+        Assert.Contains("Worsening", message.Subject, StringComparison.Ordinal);
+        Assert.Equal(2, currentState.NotificationDispatches.Count);
+    }
+
+    [Fact]
+    public async Task NotifyAsync_WhenRecoveredEndpointSettlesFromImprovingToStable_SendsStabilizedEmail()
+    {
+        var config = CreateConfig();
+        var sender = new FakeEmailSender();
+        var service = CreateService(config, sender);
+
+        var previousState = new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Healthy",
+            LastCheckedUtc = DateTimeOffset.Parse("2026-03-19T02:10:00Z"),
+            LastSuccessfulUtc = DateTimeOffset.Parse("2026-03-19T02:10:00Z"),
+            NotificationDispatches =
+            [
+                new EndpointNotificationDispatch
+                {
+                    EventType = "Recovery",
+                    ConditionLabel = "Healthy (Improving)",
+                    Signature = "recovery:Flapping:Healthy",
+                    SentUtc = DateTimeOffset.Parse("2026-03-19T02:08:00Z"),
+                    To = ["ops@example.com"]
+                }
+            ],
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:08:00Z"),
+                    Status = "Unknown",
+                    DurationMs = 200,
+                    ResultKind = "HttpError",
+                    ErrorSummary = "Endpoint returned HTTP 404 (NotFound)."
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:09:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 80,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:10:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 82,
+                    ResultKind = "Success"
+                }
+            ]
+        };
+
+        var currentState = new EndpointState
+        {
+            EndpointId = "orders-api",
+            EndpointName = "Orders API",
+            Status = "Healthy",
+            LastCheckedUtc = DateTimeOffset.Parse("2026-03-19T02:12:00Z"),
+            LastSuccessfulUtc = DateTimeOffset.Parse("2026-03-19T02:12:00Z"),
+            NotificationDispatches = previousState.NotificationDispatches.Select(static dispatch => dispatch.Clone()).ToList(),
+            RecentSamples =
+            [
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:09:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 80,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:10:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 82,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:11:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 79,
+                    ResultKind = "Success"
+                },
+                new RecentPollSample
+                {
+                    CheckedUtc = DateTimeOffset.Parse("2026-03-19T02:12:00Z"),
+                    Status = "Healthy",
+                    DurationMs = 81,
+                    ResultKind = "Success"
+                }
+            ]
+        };
+
+        await service.NotifyAsync(config.Endpoints[0], previousState, currentState);
+
+        var message = Assert.Single(sender.Messages);
+        Assert.Contains("Stabilized", message.Subject, StringComparison.Ordinal);
+        Assert.Contains("Stable Healthy", message.Subject, StringComparison.Ordinal);
+        Assert.Equal(2, currentState.NotificationDispatches.Count);
+        Assert.Equal("Stabilized", currentState.NotificationDispatches[^1].EventType);
+    }
+
     private static EndpointEmailNotificationService CreateService(DashboardConfig config, FakeEmailSender sender)
     {
         return new EndpointEmailNotificationService(

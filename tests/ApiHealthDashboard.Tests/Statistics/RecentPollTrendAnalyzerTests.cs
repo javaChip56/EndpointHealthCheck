@@ -106,4 +106,60 @@ public sealed class RecentPollTrendAnalyzerTests
 
         Assert.Equal(RecentPollTrendKind.Improving, result.TrendKind);
     }
+
+    [Fact]
+    public void Analyze_WhenImprovingStreakSettlesIntoSameStatus_ReturnsStable()
+    {
+        var samples = new[]
+        {
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 0, 0, TimeSpan.Zero),
+                Status = "Unknown",
+                DurationMs = 90,
+                ResultKind = "HttpError",
+                ErrorSummary = "Endpoint returned HTTP 404 (NotFound)."
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 1, 0, TimeSpan.Zero),
+                Status = "Unknown",
+                DurationMs = 92,
+                ResultKind = "HttpError",
+                ErrorSummary = "Endpoint returned HTTP 404 (NotFound)."
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 2, 0, TimeSpan.Zero),
+                Status = "Healthy",
+                DurationMs = 30,
+                ResultKind = "Success"
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 3, 0, TimeSpan.Zero),
+                Status = "Healthy",
+                DurationMs = 29,
+                ResultKind = "Success"
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 4, 0, TimeSpan.Zero),
+                Status = "Healthy",
+                DurationMs = 28,
+                ResultKind = "Success"
+            },
+            new RecentPollSample
+            {
+                CheckedUtc = new DateTimeOffset(2026, 03, 19, 0, 5, 0, TimeSpan.Zero),
+                Status = "Healthy",
+                DurationMs = 27,
+                ResultKind = "Success"
+            }
+        };
+
+        var result = RecentPollTrendAnalyzer.Analyze(samples);
+
+        Assert.Equal(RecentPollTrendKind.Stable, result.TrendKind);
+    }
 }

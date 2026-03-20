@@ -254,6 +254,7 @@ Current email notification behavior:
 - merges global dashboard recipients with endpoint-specific `notificationEmails` and `notificationCc`
 - sends alert emails when an endpoint enters or changes problem state
 - can send recovery emails when an endpoint returns to a non-problem state
+- can send a one-time `Stabilized` email when an endpoint settles into a `Stable ...` trend after recovering
 - treats repeated transport failures as a `Failing` condition for alerting purposes
 - records successful dispatches in endpoint runtime state so notification cooldown and history survive restarts
 

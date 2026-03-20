@@ -4,6 +4,8 @@ namespace ApiHealthDashboard.Statistics;
 
 public static class RecentPollTrendAnalyzer
 {
+    private const int SettledStatusStreakLength = 4;
+
     public static RecentPollTrendAnalysis Analyze(IEnumerable<RecentPollSample> samples)
     {
         ArgumentNullException.ThrowIfNull(samples);
@@ -67,6 +69,11 @@ public static class RecentPollTrendAnalyzer
         var currentStatus = NormalizeStatus(orderedSamples[^1].Status);
         var currentStreakLength = GetTrailingStatusStreakLength(orderedSamples, currentStatus);
         var previousDifferentStatus = GetPreviousDifferentStatus(orderedSamples, currentStatus);
+
+        if (currentStreakLength >= SettledStatusStreakLength)
+        {
+            return RecentPollTrendKind.Stable;
+        }
 
         if (currentStreakLength >= 2 && previousDifferentStatus is not null)
         {
