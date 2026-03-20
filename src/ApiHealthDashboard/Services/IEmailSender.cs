@@ -13,5 +13,7 @@ public sealed class EmailMessage
 
     public required string Subject { get; init; }
 
-    public required string Body { get; init; }
+    public required string TextBody { get; init; }
+
+    public string? HtmlBody { get; init; }
 }

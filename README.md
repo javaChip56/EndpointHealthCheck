@@ -250,11 +250,13 @@ The app now supports SMTP email notifications with dashboard-level defaults and 
 
 Current email notification behavior:
 - uses SMTP settings from appsettings under `Email:Smtp`
+- uses file-based email templates from `Email:Templates` with defaults under [`src/ApiHealthDashboard/Templates/Email`](src/ApiHealthDashboard/Templates/Email)
 - uses dashboard YAML settings to enable notifications, set recovery behavior, cooldown, minimum priority, subject prefix, and default recipients
 - merges global dashboard recipients with endpoint-specific `notificationEmails` and `notificationCc`
 - sends alert emails when an endpoint enters or changes problem state
 - can send recovery emails when an endpoint returns to a non-problem state
 - can send a one-time `Stabilized` email when an endpoint settles into a `Stable ...` trend after recovering
+- sends multipart email with HTML content plus a plain-text fallback body
 - treats repeated transport failures as a `Failing` condition for alerting purposes
 - records successful dispatches in endpoint runtime state so notification cooldown and history survive restarts
 
@@ -356,6 +358,8 @@ The current primary setting is `Bootstrap:DashboardConfigPath`. `Bootstrap:Endpo
 Runtime state persistence is configured through `RuntimeState:Enabled` and `RuntimeState:DirectoryPath` in the same appsettings files. By default, the app writes compact per-endpoint current-state files under `runtime-state/endpoints` relative to the app content root.
 
 SMTP email delivery is configured through `Email:Smtp` in the same appsettings files. Keep secrets such as SMTP usernames and passwords in environment variables or deployment-time configuration rather than committing them to source control.
+
+Email template rendering is configured through `Email:Templates` in the same appsettings files. By default, the app loads [`notification.txt`](src/ApiHealthDashboard/Templates/Email/notification.txt) and [`notification.html`](src/ApiHealthDashboard/Templates/Email/notification.html) from `Templates/Email` under the app content root.
 
 Current cleanup settings:
 - `RuntimeState:CleanupEnabled` to enable periodic runtime-state cleanup

@@ -1,4 +1,3 @@
-using System.Text;
 using ApiHealthDashboard.Configuration;
 using ApiHealthDashboard.Domain;
 using ApiHealthDashboard.Statistics;
@@ -9,6 +8,7 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
 {
     private readonly DashboardConfig _dashboardConfig;
     private readonly IEmailSender _emailSender;
+    private readonly INotificationEmailTemplateRenderer _templateRenderer;
     private readonly ILogger<EndpointEmailNotificationService> _logger;
     private readonly RuntimeStateOptions _runtimeStateOptions;
     private readonly SmtpEmailOptions _smtpOptions;
@@ -19,6 +19,7 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         RuntimeStateOptions runtimeStateOptions,
         SmtpEmailOptions smtpOptions,
         IEmailSender emailSender,
+        INotificationEmailTemplateRenderer templateRenderer,
         TimeProvider timeProvider,
         ILogger<EndpointEmailNotificationService> logger)
     {
@@ -26,6 +27,7 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         _runtimeStateOptions = runtimeStateOptions;
         _smtpOptions = smtpOptions;
         _emailSender = emailSender;
+        _templateRenderer = templateRenderer;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -89,7 +91,7 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         }
 
         var subject = BuildSubject(notificationSettings.SubjectPrefix, notification.EventType, endpoint.Name, notification.SubjectLabel);
-        var body = BuildBody(endpoint, previousCondition, currentCondition, notification);
+        var body = BuildBody(endpoint, previousCondition, currentCondition, notification, subject);
 
         await _emailSender.SendAsync(
             new EmailMessage
@@ -97,7 +99,8 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
                 To = recipients.To,
                 Cc = recipients.Cc,
                 Subject = subject,
-                Body = body
+                TextBody = body.TextBody,
+                HtmlBody = body.HtmlBody
             },
             cancellationToken);
 
@@ -281,44 +284,33 @@ public sealed class EndpointEmailNotificationService : IEndpointNotificationServ
         return $"{prefix} {eventType}: {endpointName} - {label}";
     }
 
-    private static string BuildBody(
+    private NotificationEmailContent BuildBody(
         EndpointConfig endpoint,
         NotificationCondition previousCondition,
         NotificationCondition currentCondition,
-        NotificationDecision notification)
+        NotificationDecision notification,
+        string subject)
     {
-        var builder = new StringBuilder();
-        builder.AppendLine($"Endpoint: {endpoint.Name} ({endpoint.Id})");
-        builder.AppendLine($"URL: {endpoint.Url}");
-        builder.AppendLine($"Priority: {EndpointPriority.Normalize(endpoint.Priority)}");
-        builder.AppendLine($"Event: {notification.EventType}");
-        builder.AppendLine($"Current status: {currentCondition.Status}");
-        builder.AppendLine($"Current trend: {currentCondition.TrendLabel}");
-
-        if (!string.IsNullOrWhiteSpace(previousCondition.Label))
-        {
-            builder.AppendLine($"Previous condition: {previousCondition.Label}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(currentCondition.ErrorSummary))
-        {
-            builder.AppendLine($"Error: {currentCondition.ErrorSummary}");
-        }
-
-        if (currentCondition.CheckedUtc is DateTimeOffset checkedUtc)
-        {
-            builder.AppendLine($"Checked: {checkedUtc.ToUniversalTime():yyyy-MM-dd HH:mm:ss 'UTC'}");
-        }
-
-        builder.AppendLine();
-        builder.AppendLine(notification.EventType switch
-        {
-            "Recovery" => "The endpoint has recovered from its previous problem state.",
-            "Stabilized" => "The endpoint has settled into a stable state after recovering from an earlier issue.",
-            _ => "The endpoint entered or changed problem state and may need attention."
-        });
-
-        return builder.ToString().TrimEnd();
+        return _templateRenderer.Render(new NotificationEmailTemplateModel(
+            subject,
+            notification.EventType,
+            endpoint.Name,
+            endpoint.Id,
+            endpoint.Url,
+            EndpointPriority.Normalize(endpoint.Priority),
+            currentCondition.Status,
+            currentCondition.TrendLabel,
+            previousCondition.Label,
+            currentCondition.ErrorSummary ?? string.Empty,
+            currentCondition.CheckedUtc is DateTimeOffset checkedUtc
+                ? checkedUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+                : "-",
+            notification.EventType switch
+            {
+                "Recovery" => "The endpoint has recovered from its previous problem state.",
+                "Stabilized" => "The endpoint has settled into a stable state after recovering from an earlier issue.",
+                _ => "The endpoint entered or changed problem state and may need attention."
+            }));
     }
 
     private sealed record NotificationRecipients(IReadOnlyList<string> To, IReadOnlyList<string> Cc);

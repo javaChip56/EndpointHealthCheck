@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
 using ApiHealthDashboard.Configuration;
 
 namespace ApiHealthDashboard.Services;
@@ -24,10 +25,25 @@ public sealed class SmtpEmailSender : IEmailSender
         using var mailMessage = new MailMessage
         {
             From = new MailAddress(_options.FromAddress, _options.FromName),
-            Subject = message.Subject,
-            Body = message.Body,
-            IsBodyHtml = false
+            Subject = message.Subject
         };
+
+        if (!string.IsNullOrWhiteSpace(message.HtmlBody))
+        {
+            mailMessage.Body = message.HtmlBody;
+            mailMessage.IsBodyHtml = true;
+            mailMessage.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
+                message.TextBody,
+                new ContentType(MediaTypeNames.Text.Plain)));
+            mailMessage.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
+                message.HtmlBody,
+                new ContentType(MediaTypeNames.Text.Html)));
+        }
+        else
+        {
+            mailMessage.Body = message.TextBody;
+            mailMessage.IsBodyHtml = false;
+        }
 
         foreach (var recipient in message.To)
         {

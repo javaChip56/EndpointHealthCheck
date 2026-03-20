@@ -72,6 +72,8 @@ public sealed class EndpointEmailNotificationServiceTests
         var message = Assert.Single(sender.Messages);
         Assert.Contains("Alert", message.Subject, StringComparison.Ordinal);
         Assert.Contains("Failing", message.Subject, StringComparison.Ordinal);
+        Assert.Contains("Event: Alert", message.TextBody, StringComparison.Ordinal);
+        Assert.Contains("<strong>Alert</strong>", message.HtmlBody, StringComparison.Ordinal);
         Assert.Equal(["ops@example.com", "service-owner@example.com"], message.To.OrderBy(static value => value).ToArray());
         Assert.Equal(["lead@example.com", "teamlead@example.com"], message.Cc.OrderBy(static value => value).ToArray());
         var dispatch = Assert.Single(currentState.NotificationDispatches);
@@ -144,6 +146,7 @@ public sealed class EndpointEmailNotificationServiceTests
 
         var message = Assert.Single(sender.Messages);
         Assert.Contains("Recovery", message.Subject, StringComparison.Ordinal);
+        Assert.Contains("Event: Recovery", message.TextBody, StringComparison.Ordinal);
         Assert.Single(currentState.NotificationDispatches);
     }
 
@@ -389,6 +392,7 @@ public sealed class EndpointEmailNotificationServiceTests
         var message = Assert.Single(sender.Messages);
         Assert.Contains("Stabilized", message.Subject, StringComparison.Ordinal);
         Assert.Contains("Stable Healthy", message.Subject, StringComparison.Ordinal);
+        Assert.Contains("Event: Stabilized", message.TextBody, StringComparison.Ordinal);
         Assert.Equal(2, currentState.NotificationDispatches.Count);
         Assert.Equal("Stabilized", currentState.NotificationDispatches[^1].EventType);
     }
@@ -410,6 +414,7 @@ public sealed class EndpointEmailNotificationServiceTests
                 FromName = "ApiHealthDashboard"
             },
             sender,
+            new FakeNotificationEmailTemplateRenderer(),
             TimeProvider.System,
             NullLogger<EndpointEmailNotificationService>.Instance);
     }
@@ -456,6 +461,16 @@ public sealed class EndpointEmailNotificationServiceTests
         {
             Messages.Add(message);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeNotificationEmailTemplateRenderer : INotificationEmailTemplateRenderer
+    {
+        public NotificationEmailContent Render(NotificationEmailTemplateModel model)
+        {
+            return new NotificationEmailContent(
+                $"Subject: {model.Subject}\nEvent: {model.EventType}\nCurrent status: {model.CurrentStatus}\nCurrent trend: {model.CurrentTrend}\nSummary: {model.SummaryText}",
+                $"<html><body><strong>{model.EventType}</strong><div>{model.EndpointName}</div><div>{model.CurrentTrend}</div></body></html>");
         }
     }
 }
