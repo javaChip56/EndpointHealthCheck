@@ -36,10 +36,10 @@ Implemented so far:
 - Post-v1: mini trend visuals and short status history from retained runtime samples
 - Post-v1: SMTP email notifications with dashboard defaults and per-endpoint recipients
 - Post-v1: persisted notification dispatch history in runtime state
-- Post-v1: Docker Compose deployment support for Linux and Windows container environments
+- Post-v1: Docker Compose deployment support with a validated Linux container flow and a Windows-container compose file
 
-Not implemented yet:
-- Backlog items tracked for post-v1 work
+Future backlog:
+- Optional enhancements that are not part of the current implemented surface are tracked under Future Plans.
 
 ## Solution Layout
 
@@ -329,7 +329,7 @@ Validated deployment behavior:
 - no database package or runtime dependency is required
 - no Node.js, npm, yarn, or frontend build tool dependency is required
 - Docker Compose can build and run the app as a Linux container with a configurable host port
-- a Windows-container compose file is included for Docker engines switched to Windows containers
+- a Windows-container compose file validates and is included for Docker engines switched to Windows containers
 
 ### GitHub Actions And Dependabot
 
@@ -462,7 +462,7 @@ Deployment notes:
 - the published folder is runnable on its own with the included `dashboard.yaml` and endpoint YAML files
 - local UI assets under `wwwroot/adminlte` remain bundled after publish
 - no additional database or Node.js setup is required for the published app
-- Docker Compose deployment is available through [`docker-compose.yml`](docker-compose.yml) for Linux containers and [`docker-compose.windows.yml`](docker-compose.windows.yml) for Windows containers
+- Docker Compose deployment is available through [`docker-compose.yml`](docker-compose.yml) for validated Linux container builds and [`docker-compose.windows.yml`](docker-compose.windows.yml) for Windows container hosts
 - the host port is controlled by `APIHEALTHDASHBOARD_PORT`, for example `$env:APIHEALTHDASHBOARD_PORT="9090"; docker compose up -d --build`
 
 ## CI/CD Automation
@@ -572,9 +572,9 @@ Test file:
 
 ## Future Plans
 
-These are planned enhancements after the current v1 path:
-- add configurable retention controls for future persisted history files once trend capture is introduced
-- optionally add per-endpoint history files once the embedded recent-sample window is no longer sufficient
+These are planned enhancements beyond the current implemented surface:
+- optionally add long-term persisted history files beyond the embedded recent-sample window
+- optionally add retention controls for any future long-term history stores
 - optionally add external email API delivery in addition to the current SMTP implementation
 
 ## Notes For Ongoing Updates
