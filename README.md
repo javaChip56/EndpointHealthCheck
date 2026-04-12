@@ -36,15 +36,20 @@ Implemented so far:
 - Post-v1: mini trend visuals and short status history from retained runtime samples
 - Post-v1: SMTP email notifications with dashboard defaults and per-endpoint recipients
 - Post-v1: persisted notification dispatch history in runtime state
+- Post-v1: Docker Compose deployment support with a validated Linux container flow and a Windows-container compose file
 
-Not implemented yet:
-- Backlog items tracked for post-v1 work
+Future backlog:
+- Optional enhancements that are not part of the current implemented surface are tracked under Future Plans.
 
 ## Solution Layout
 
 ```text
 .
 |-- ApiHealthDashboard.sln
+|-- Dockerfile
+|-- docker-compose.yml
+|-- docker-compose.windows.yml
+|-- DOCKER.md
 |-- README.md
 |-- src/
 |   `-- ApiHealthDashboard/
@@ -323,6 +328,8 @@ Validated deployment behavior:
 - bundled CSS assets load from the published folders without relying on external CDNs
 - no database package or runtime dependency is required
 - no Node.js, npm, yarn, or frontend build tool dependency is required
+- Docker Compose can build and run the app as a Linux container with a configurable host port
+- a Windows-container compose file validates and is included for Docker engines switched to Windows containers
 
 ### GitHub Actions And Dependabot
 
@@ -339,6 +346,7 @@ Current automation behavior:
 - CI restores, builds in Release mode, runs tests, and uploads TRX test results
 - CodeQL runs for C# on pushes to `master`, `develop`, and `enhancements`, pull requests targeting those branches, and manual dispatches
 - Release automation verifies the solution, publishes self-contained artifacts for `win-x64` and `linux-x64`, packages them, generates checksums, and uploads them to the GitHub release
+- Release automation validates Docker Compose config, builds and probes the Linux compose image, and packages a Docker Compose source bundle with checksums
 - Dependabot monitors both NuGet dependencies and GitHub Actions workflow dependencies on a weekly schedule
 
 ## Running The App
@@ -375,6 +383,30 @@ You can also override it with an environment variable:
 $env:APIHEALTHDASHBOARD_BOOTSTRAP__DASHBOARDCONFIGPATH="D:\path\to\dashboard.yaml"
 dotnet run --project .\src\ApiHealthDashboard\ApiHealthDashboard.csproj
 ```
+
+## Running With Docker Compose
+
+Linux containers:
+
+```powershell
+docker compose up -d --build
+```
+
+Use `APIHEALTHDASHBOARD_PORT` to choose the host port:
+
+```powershell
+$env:APIHEALTHDASHBOARD_PORT="9090"
+docker compose up -d --build
+```
+
+Windows containers:
+
+```powershell
+$env:APIHEALTHDASHBOARD_PORT="9090"
+docker compose -f .\docker-compose.windows.yml up -d --build
+```
+
+Docker Compose stores runtime state in a named volume. More deployment notes are in [`DOCKER.md`](DOCKER.md).
 
 ## Running The CLI
 
@@ -430,6 +462,8 @@ Deployment notes:
 - the published folder is runnable on its own with the included `dashboard.yaml` and endpoint YAML files
 - local UI assets under `wwwroot/adminlte` remain bundled after publish
 - no additional database or Node.js setup is required for the published app
+- Docker Compose deployment is available through [`docker-compose.yml`](docker-compose.yml) for validated Linux container builds and [`docker-compose.windows.yml`](docker-compose.windows.yml) for Windows container hosts
+- the host port is controlled by `APIHEALTHDASHBOARD_PORT`, for example `$env:APIHEALTHDASHBOARD_PORT="9090"; docker compose up -d --build`
 
 ## CI/CD Automation
 
@@ -437,13 +471,15 @@ Repository automation now includes:
 - CI build and test workflow for `master`, `develop`, and `enhancements`
 - CodeQL SAST workflow for C#
 - release packaging workflow for self-contained GitHub release artifacts
+- Docker Compose release bundle validation and packaging
 - Dependabot configuration for NuGet and GitHub Actions dependencies
 
 Release flow:
 1. Create and push a version tag such as `v1.0.1`
 2. GitHub Actions runs the release workflow automatically
 3. The workflow verifies build and tests, publishes `win-x64` and `linux-x64` self-contained outputs, packages them, and generates `.sha256` checksum files
-4. The packaged artifacts are attached to the GitHub release
+4. The workflow validates Docker Compose, builds and probes the Linux container path, and packages a Docker Compose source bundle as `.zip` and `.tar.gz`
+5. The packaged artifacts are attached to the GitHub release
 
 Manual release flow:
 - Run the `Release` workflow from GitHub Actions with a `release_version`
@@ -536,9 +572,9 @@ Test file:
 
 ## Future Plans
 
-These are planned enhancements after the current v1 path:
-- add configurable retention controls for future persisted history files once trend capture is introduced
-- optionally add per-endpoint history files once the embedded recent-sample window is no longer sufficient
+These are planned enhancements beyond the current implemented surface:
+- optionally add long-term persisted history files beyond the embedded recent-sample window
+- optionally add retention controls for any future long-term history stores
 - optionally add external email API delivery in addition to the current SMTP implementation
 
 ## Notes For Ongoing Updates

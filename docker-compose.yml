@@ -1,0 +1,22 @@
+services:
+  apihealthdashboard:
+    image: ${APIHEALTHDASHBOARD_IMAGE:-apihealthdashboard:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SDK_IMAGE: ${APIHEALTHDASHBOARD_SDK_IMAGE:-mcr.microsoft.com/dotnet/sdk:8.0}
+        RUNTIME_IMAGE: ${APIHEALTHDASHBOARD_RUNTIME_IMAGE:-mcr.microsoft.com/dotnet/aspnet:8.0}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_HTTP_PORTS: 8080
+      APIHEALTHDASHBOARD_BOOTSTRAP__DASHBOARDCONFIGPATH: dashboard.yaml
+      APIHEALTHDASHBOARD_RUNTIMESTATE__DIRECTORYPATH: runtime-state/endpoints
+    ports:
+      - "${APIHEALTHDASHBOARD_PORT:-8080}:8080"
+    volumes:
+      - apihealthdashboard-runtime-state:/app/runtime-state
+    restart: unless-stopped
+
+volumes:
+  apihealthdashboard-runtime-state:
