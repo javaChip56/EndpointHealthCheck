@@ -1,0 +1,15 @@
+.git/
+.github/
+artifacts/
+TestResults/
+runtime-state/
+
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+
+*.user
+*.suo
+*.tmp
+*.log

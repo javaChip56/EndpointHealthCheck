@@ -140,3 +140,100 @@ jobs:
           files: |
             ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}
             ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-${{ matrix.runtime }}.${{ matrix.archive_extension }}.sha256
+
+  docker-compose:
+    name: Docker Compose Release Bundle
+    needs:
+      - prepare
+      - verify
+    runs-on: ubuntu-latest
+
+    env:
+      APIHEALTHDASHBOARD_IMAGE: apihealthdashboard:release-${{ github.run_id }}
+      APIHEALTHDASHBOARD_PORT: 18080
+      COMPOSE_PROJECT_NAME: apihealthdashboard-release
+      RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Validate Docker Compose config
+        run: docker compose -f docker-compose.yml config
+
+      - name: Validate Windows Docker Compose config
+        run: docker compose -f docker-compose.windows.yml config
+
+      - name: Build Linux Docker Compose image
+        run: docker compose -f docker-compose.yml build
+
+      - name: Start Docker Compose app
+        run: docker compose -f docker-compose.yml up -d --no-build
+
+      - name: Probe Docker Compose app
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error "http://localhost:${APIHEALTHDASHBOARD_PORT}/" > /dev/null; then
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          docker compose -f docker-compose.yml logs
+          exit 1
+
+      - name: Stop Docker Compose app
+        if: ${{ always() }}
+        run: docker compose -f docker-compose.yml down --volumes --remove-orphans
+
+      - name: Package Docker Compose source bundle
+        shell: pwsh
+        run: |
+          $bundlePath = "./artifacts/docker-compose-bundle"
+          New-Item -ItemType Directory -Path $bundlePath -Force | Out-Null
+          New-Item -ItemType Directory -Path "$bundlePath/src" -Force | Out-Null
+
+          Copy-Item "Dockerfile" "$bundlePath/Dockerfile"
+          Copy-Item ".dockerignore" "$bundlePath/.dockerignore"
+          Copy-Item "docker-compose.yml" "$bundlePath/docker-compose.yml"
+          Copy-Item "docker-compose.windows.yml" "$bundlePath/docker-compose.windows.yml"
+          Copy-Item ".env.example" "$bundlePath/.env.example"
+          Copy-Item "DOCKER.md" "$bundlePath/DOCKER.md"
+          Copy-Item "src/ApiHealthDashboard" "$bundlePath/src/ApiHealthDashboard" -Recurse
+
+      - name: Package Docker Compose zip
+        run: zip -r "../ApiHealthDashboard-${RELEASE_VERSION}-docker-compose.zip" .
+        working-directory: ./artifacts/docker-compose-bundle
+
+      - name: Package Docker Compose tarball
+        run: tar -C "./artifacts/docker-compose-bundle" -czf "./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.tar.gz" .
+
+      - name: Generate Docker Compose bundle checksums
+        run: |
+          sha256sum "./artifacts/ApiHealthDashboard-${RELEASE_VERSION}-docker-compose.zip" > "./artifacts/ApiHealthDashboard-${RELEASE_VERSION}-docker-compose.zip.sha256"
+          sha256sum "./artifacts/ApiHealthDashboard-${RELEASE_VERSION}-docker-compose.tar.gz" > "./artifacts/ApiHealthDashboard-${RELEASE_VERSION}-docker-compose.tar.gz.sha256"
+
+      - name: Upload Docker Compose bundle to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-docker-compose
+          path: |
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.zip
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.zip.sha256
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.tar.gz
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.tar.gz.sha256
+          if-no-files-found: error
+
+      - name: Upload Docker Compose bundle to GitHub Release
+        if: ${{ needs.prepare.outputs.should_upload_release == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.zip
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.zip.sha256
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.tar.gz
+            ./artifacts/ApiHealthDashboard-${{ env.RELEASE_VERSION }}-docker-compose.tar.gz.sha256
